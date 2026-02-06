@@ -1,0 +1,41 @@
+### --- 根目录及通用规则 --- ###
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+node_modules/
+
+### --- Backend (Spring Boot) 规则 --- ###
+# 这里的路径前缀加上 backend/ 确保精准拦截
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+backend/mvnw
+backend/mvnw.cmd
+backend/.factorypath
+backend/HELP.md
+
+### --- Frontend (Nuxt.js) 规则 --- ###
+# Nuxt 构建输出和依赖
+frontend/node_modules/
+frontend/.nuxt/
+frontend/.output/
+frontend/dist/
+
+# Nuxt 环境变量文件
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# 日志文件
+frontend/*.log
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+### --- 系统与临时文件 --- ###
+.DS_Store
+Thumbs.db
+
+.tmp.driveupload/
