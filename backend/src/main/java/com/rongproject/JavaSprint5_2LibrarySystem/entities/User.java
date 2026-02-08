@@ -36,6 +36,4 @@ public class User {
     private boolean enabled = true;
 
     private String avatarUrl;
-
-
 }
