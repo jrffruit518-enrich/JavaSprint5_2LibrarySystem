@@ -1,7 +1,10 @@
-package com.rongproject.JavaSprint5_2LibrarySystem.Entity;
+package com.rongproject.JavaSprint5_2LibrarySystem.entities;
 
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.BookGenre;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -37,9 +40,21 @@ public class Book {
     @Column(nullable = false)
     private LocalDate publicationDate;
 
+    @DecimalMin("0.0")
+    @DecimalMax("5.0")
+    @Column(nullable = false)
+    private Double rating;
+
+    @Lob
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String description;
+
     @Builder.Default
     @Min(0)
     @Column(nullable = false)
     private Integer availableStock = 1;
+
+
+    private String coverImageUrl;
 
 }

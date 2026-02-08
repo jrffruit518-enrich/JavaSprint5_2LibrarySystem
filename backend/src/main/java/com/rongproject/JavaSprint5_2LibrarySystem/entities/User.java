@@ -1,4 +1,4 @@
-package com.rongproject.JavaSprint5_2LibrarySystem.Entity;
+package com.rongproject.JavaSprint5_2LibrarySystem.entities;
 
 
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.UserRole;
@@ -34,6 +34,8 @@ public class User {
 
     @Builder.Default
     private boolean enabled = true;
+
+    private String avatarUrl;
 
 
 }

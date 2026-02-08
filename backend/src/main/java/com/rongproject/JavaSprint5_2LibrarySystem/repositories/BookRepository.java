@@ -1,6 +1,6 @@
-package com.rongproject.JavaSprint5_2LibrarySystem.repository;
+package com.rongproject.JavaSprint5_2LibrarySystem.repositories;
 
-import com.rongproject.JavaSprint5_2LibrarySystem.Entity.Book;
+import com.rongproject.JavaSprint5_2LibrarySystem.entities.Book;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

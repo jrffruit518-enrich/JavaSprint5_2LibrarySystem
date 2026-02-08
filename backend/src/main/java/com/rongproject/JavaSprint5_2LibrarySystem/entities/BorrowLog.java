@@ -1,4 +1,4 @@
-package com.rongproject.JavaSprint5_2LibrarySystem.Entity;
+package com.rongproject.JavaSprint5_2LibrarySystem.entities;
 
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.LogStatus;
 import jakarta.validation.constraints.NotNull;

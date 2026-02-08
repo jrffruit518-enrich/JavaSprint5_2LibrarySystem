@@ -1,4 +1,4 @@
-package com.rongproject.JavaSprint5_2LibrarySystem.Config;
+package com.rongproject.JavaSprint5_2LibrarySystem.configs;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

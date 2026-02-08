@@ -1,6 +1,6 @@
-package com.rongproject.JavaSprint5_2LibrarySystem.repository;
+package com.rongproject.JavaSprint5_2LibrarySystem.repositories;
 
-import com.rongproject.JavaSprint5_2LibrarySystem.Entity.BorrowLog;
+import com.rongproject.JavaSprint5_2LibrarySystem.entities.BorrowLog;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface BorrowLogRepository extends MongoRepository<BorrowLog,String> {
