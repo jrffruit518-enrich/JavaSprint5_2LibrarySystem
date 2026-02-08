@@ -39,3 +39,11 @@ frontend/yarn-error.log*
 Thumbs.db
 
 .tmp.driveupload/
+
+gen_tree.bat
+Structure.txt
+
+sync_to_txt.bat
+docs_for_ai/
+
+Structure-Tree.bat
