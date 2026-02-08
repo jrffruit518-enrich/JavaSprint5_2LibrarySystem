@@ -1,0 +1,10 @@
+package com.rongproject.JavaSprint5_2LibrarySystem.repository;
+
+import com.rongproject.JavaSprint5_2LibrarySystem.Entity.Book;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+
+public interface BookRepository extends JpaRepository<Book,Long> {
+    Optional<Book> findByTitle(String title);
+}
