@@ -1,5 +1,6 @@
 package com.rongproject.JavaSprint5_2LibrarySystem.services;
 
+import com.rongproject.JavaSprint5_2LibrarySystem.DTO.BorrowLogResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserStatusResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.configs.LibraryConstants;
 import com.rongproject.JavaSprint5_2LibrarySystem.entities.Book;
@@ -25,7 +26,8 @@ public class BorrowService {
     private final BorrowLogRepository borrowLogRepository;
 
     @Transactional
-    public BorrowLog borrowBook(Long userId, Long bookId) {
+    public BorrowLogResponse borrowBook(Long userId, Long bookId) {
+        User user = userRepository.findByIdOrThrow(userId);
         // 1. First, check if the user is allowed to borrow
         UserStatusResponse status = getUserBorrowingStatus(userId);
         if (!status.canBorrow()) {
@@ -52,7 +54,25 @@ public class BorrowService {
                 .status(LogStatus.BORROWED)
                 .build();
 
-        return borrowLogRepository.save(log);
+        BorrowLog savedLog = borrowLogRepository.save(log);
+
+        // 5. 组装最后一句提示语
+        // 注意：dueDate.toLocalDate() 可以让日期显示更整洁 (只显示年月日)
+        LocalDateTime dueDate = LocalDateTime.now().plusDays(LibraryConstants.OVERDUE_DAYS);
+        String welcomeMessage = String.format("%s，你已成功借阅了《%s》，请于 %s 前归还。",
+                user.getUsername(),
+                book.getTitle(),
+                dueDate.toLocalDate());
+
+        return new BorrowLogResponse(
+                savedLog.getId(),
+                userRepository.findById(userId).map(User::getUsername).orElse("Unknown"),
+                book.getTitle(),
+                savedLog.getBorrowDate(),
+                savedLog.getReturnDate(),
+                savedLog.getStatus(),
+                "Book borrowed successfully."
+        );
     }
 
     @Transactional
@@ -79,8 +99,7 @@ public class BorrowService {
     }
 
     public UserStatusResponse getUserBorrowingStatus(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        User user = userRepository.findByIdOrThrow(userId);
 
         // Check MongoDB for overdue and count
         LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(LibraryConstants.OVERDUE_DAYS);
@@ -108,15 +127,15 @@ public class BorrowService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         // Check if the user still has any other overdue books
-        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(LibraryConstants.OVERDUE_DAYS);
         boolean hasOtherOverdue = borrowLogRepository.existsByUserIdAndStatusAndBorrowDateBefore(
                 userId, LogStatus.BORROWED, thirtyDaysAgo);
 
-        // Check if they are now below the borrowing limit (e.g., < 10)
+        // Check if they are now below the borrowing limit
         long activeBorrowCount = borrowLogRepository.countByUserIdAndStatus(userId, LogStatus.BORROWED);
 
         // If no more overdue books and under the limit, re-enable the account
-        if (!hasOtherOverdue && activeBorrowCount < 10) {
+        if (!hasOtherOverdue && activeBorrowCount < LibraryConstants.MAX_BORROW_LIMIT) {
             user.setEnabled(true);
             userRepository.save(user);
         }
