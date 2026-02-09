@@ -79,7 +79,7 @@ public class BorrowingService {
     public LogResponse returnBook(Long userId, Long bookId) {
         // 1. 获取用户和图书 (用于后续组装 Response，同时确保 ID 有效)
         User user = userRepository.findByIdOrThrow(userId);
-        Book book = bookRepository.findByIdOrThrow(bookId);
+        Book book = bookRepository.getBookById(bookId);
 
         // 2. Find the active borrow log
         BorrowLog log = borrowLogRepository.findFirstByUserIdAndBookIdAndStatusOrderByBorrowDateDesc(
