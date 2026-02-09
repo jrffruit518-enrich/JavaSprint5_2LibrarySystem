@@ -13,4 +13,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
         return findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + id));
     }
+    Boolean existsByUsername(String username);
+    Boolean existsByEmail(String email);
 }
