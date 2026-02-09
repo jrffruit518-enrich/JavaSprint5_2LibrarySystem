@@ -3,6 +3,7 @@ package com.rongproject.JavaSprint5_2LibrarySystem.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.BookCreationRequest;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.BookResponse;
+import com.rongproject.JavaSprint5_2LibrarySystem.configs.SecurityConfig;
 import com.rongproject.JavaSprint5_2LibrarySystem.controllers.BookController;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.BookGenre;
 import com.rongproject.JavaSprint5_2LibrarySystem.services.BookService;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -27,6 +29,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@Import(SecurityConfig.class)
 @WebMvcTest(BookController.class) // 只加载 Web 层，不启动整个 Context
 @AutoConfigureMockMvc
 public class BookControllerTest {
@@ -132,10 +135,11 @@ public class BookControllerTest {
     }
 
     @Test
-    @DisplayName("DELETE /api/books/{id} - Failure (Unauthorized)")
+    @DisplayName("DELETE /api/books/{id} - Failure (Anonymous)")
     void deleteBook_Failure_Anonymous() throws Exception {
         // 不带 @WithMockUser，模拟匿名用户
         mockMvc.perform(delete("/api/books/1").with(csrf()))
-                .andExpect(status().isUnauthorized()); // 应该重定向或返回 401/403
+                // 将 .isUnauthorized() (401) 改为 .isForbidden() (403)
+                .andExpect(status().isForbidden());
     }
 }
