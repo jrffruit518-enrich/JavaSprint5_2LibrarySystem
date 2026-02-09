@@ -9,8 +9,12 @@ import java.util.Optional;
 public interface BookRepository extends JpaRepository<Book,Long> {
     Optional<Book> findByTitle(String title);
 
-    default Book findByIdOrThrow(Long id) {
+    // Check if ISBN already exists
+    boolean existsByIsbn(String isbn);
+
+    default Book getBookById(Long id) {
         return findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Book not found with ID: " + id));
     }
+
 }
