@@ -15,64 +15,54 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // 1. Handle Validation Errors (e.g., @Valid, @NotNull in Entity)
+    // 1. Handle Validation Errors (e.g., @Valid)
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
         String details = ex.getBindingResult().getFieldErrors().stream()
                 .map(e -> e.getField() + ": " + e.getDefaultMessage())
                 .collect(Collectors.joining("; "));
 
-        var error = new ApiErrorResponse(
-                HttpStatus.BAD_REQUEST.value(),
-                "Validation failed: " + details,
-                LocalDateTime.now()
-        );
-        return ResponseEntity.badRequest().body(error);
+        log.warn("Validation failed: {}", details); // Log as warning
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Validation failed: " + details);
     }
 
     // 2. Handle JSON Format Errors (e.g., invalid JSON body)
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiErrorResponse> handleJsonError(HttpMessageNotReadableException ex) {
-        var error = new ApiErrorResponse(
-                HttpStatus.BAD_REQUEST.value(),
-                "Invalid JSON format or type mismatch",
-                LocalDateTime.now()
-        );
-        return ResponseEntity.badRequest().body(error);
+        log.warn("JSON parse error: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Invalid JSON format or type mismatch");
     }
 
     // 3. Handle Resource Not Found (404)
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleNotFound(ResourceNotFoundException ex) {
-        var error = new ApiErrorResponse(
-                HttpStatus.NOT_FOUND.value(),
-                ex.getMessage(),
-                LocalDateTime.now()
-        );
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+        log.warn("Resource not found: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
     // 4. Handle Illegal States (e.g., Book out of stock - 409 Conflict)
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiErrorResponse> handleIllegalState(IllegalStateException ex) {
-        var error = new ApiErrorResponse(
-                HttpStatus.CONFLICT.value(),
-                ex.getMessage(),
-                LocalDateTime.now()
-        );
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+        log.warn("Business logic conflict: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.CONFLICT, ex.getMessage());
     }
 
     // 5. Catch-all for unexpected internal errors (500)
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleAll(Exception ex) {
+        // Here we use the @Slf4j log to record the full stack trace for debugging
         log.error("Unhandled exception caught: ", ex);
+        return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected internal error occurred.");
+    }
 
-        var error = new ApiErrorResponse(
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "An unexpected internal error occurred.",
+    // --- Private Helper Method to Keep Code DRY ---
+    private ResponseEntity<ApiErrorResponse> buildErrorResponse(HttpStatus status, String message) {
+        ApiErrorResponse errorResponse = new ApiErrorResponse(
+                status.value(),
+                status.getReasonPhrase(), // Automatically populates "Bad Request", "Not Found", etc.
+                message,
                 LocalDateTime.now()
         );
-        return ResponseEntity.internalServerError().body(error);
+        return new ResponseEntity<>(errorResponse, status);
     }
 }
