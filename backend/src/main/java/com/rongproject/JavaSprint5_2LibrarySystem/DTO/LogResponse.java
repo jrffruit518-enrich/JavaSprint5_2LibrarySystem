@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
  * Replaces technical IDs with readable names and adds a user-friendly message.
  */
 @Schema(description = "Response object detailing a borrowing record with user-friendly messages")
-public record BorrowLogResponse(
+public record LogResponse(
         @Schema(description = "The unique MongoDB document ID for the log", example = "65c4f1a2b3c4d5e6f7a8b9c0")
         String logId,
 
