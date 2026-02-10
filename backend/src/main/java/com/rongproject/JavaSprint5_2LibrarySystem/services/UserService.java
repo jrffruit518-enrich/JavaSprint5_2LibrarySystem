@@ -2,6 +2,7 @@ package com.rongproject.JavaSprint5_2LibrarySystem.services;
 
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.entities.User;
+import com.rongproject.JavaSprint5_2LibrarySystem.enums.UserRole;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -14,10 +15,27 @@ import java.util.List;
 public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    
+
     public UserResponse createUser(User user) {
+        // 1. 基础校验：验证用户名是否存在（无论什么角色都需要验证 Name）
+        if (userRepository.existsByUsername(user.getUsername())) {
+            throw new RuntimeException("Username already exists: " + user.getUsername());
+        }
+
+        // 2. 针对普通用户 (USER) 的额外校验
+        // English Comment: Additional unique check for email only if the role is USER
+        if (user.getUserRole() == UserRole.ROLE_USER) {
+            if (userRepository.existsByEmail(user.getEmail())) {
+                throw new RuntimeException("Email already exists: " + user.getEmail());
+            }
+        }
+        // English Comment: If role is ADMIN, only username check is needed (already done above)
+        // Passwords can be the same as per requirements, so no check needed for that.
+
+        // 3. 加密并保存
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         User savedUser = userRepository.save(user);
+
         return mapToResponse(savedUser);
     }
     
