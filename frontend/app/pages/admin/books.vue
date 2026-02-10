@@ -4,11 +4,11 @@
 
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-highlighted">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
           Book Management
         </h1>
-        <p class="text-muted text-sm">
-          Add, update or remove books from the library collection.
+        <p class="text-sm text-gray-500">
+          Direct administrative control over the library inventory.
         </p>
       </div>
 
@@ -16,61 +16,151 @@
         label="Add New Book"
         icon="i-lucide-plus"
         color="primary"
-        @click="isAddModalOpen = true"
+        @click="openAddMode"
       />
     </div>
 
-    <UCard>
+    <BookDetailPanel
+      :book="selectedBook"
+      :mode="currentMode"
+      role="admin"
+      @save="handleSave"
+      @change-mode="(val) => currentMode = val"
+    />
+
+    <UAlert
+      v-if="error"
+      icon="i-lucide-circle-alert"
+      color="error"
+      variant="soft"
+      title="Fetch Error"
+      :description="error.message || 'Failed to load books from server.'"
+    />
+
+    <UCard
+      v-else
+      class="mb-8 border-2 border-primary/20 shadow-lg"
+      :ui="{ body: 'p-6' }"
+    >
+      <div
+        v-if="status === 'pending'"
+        class="py-10 text-center"
+      >
+        <UIcon
+          name="i-lucide-loader-2"
+          class="animate-spin w-8 h-8 mx-auto text-primary"
+        />
+      </div>
+
       <BookTable
-        :data="allBooks"
+        v-else
+        :data="books || []"
         role="admin"
+        @view="handleView"
         @edit="handleEdit"
         @delete="handleDelete"
       />
     </UCard>
-
-    <UModal
-      v-model:open="isAddModalOpen"
-      title="Manage Book"
-    >
-      <template #content>
-        <div class="p-4 text-center text-muted">
-          Book Form will be here (Linked to your Backend later).
-        </div>
-      </template>
-    </UModal>
   </div>
 </template>
 
-<script setup>
-/* 使用管理员侧导航布局 */
+<script setup lang="ts">
+/**
+ * 图书馆项目 (Library Project) - Admin Management Page
+ */
+import type { Book } from '~/types/book'
+
+/* 1. Page State */
+const currentMode = ref<'view' | 'edit' | 'add'>('view')
+const selectedBook = ref<Book>({} as Book)
+
+/* 2. Data Fetching */
+const { data: books, refresh, status, error } = await useApi<Book[]>('/api/books')
+
+/* 3. Helper: Smooth Scroll */
+const scrollToTop = () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+/* 4. Action Handlers */
+const handleView = (book: Book) => {
+  selectedBook.value = { ...book }
+  currentMode.value = 'view'
+  scrollToTop()
+}
+
+const handleEdit = (book: Book) => {
+  selectedBook.value = { ...book }
+  currentMode.value = 'edit'
+  scrollToTop()
+}
+
+const openAddMode = () => {
+  // English Comment: Initialize empty book to trigger the 'add' form in the panel
+  selectedBook.value = {
+    title: '',
+    author: '',
+    isbn: '',
+    bookGenre: 'FICTION',
+    rating: 0,
+    availableStock: 1,
+    description: '',
+    coverImageUrl: ''
+  } as Book
+  currentMode.value = 'add'
+  scrollToTop()
+}
+
+const handleSave = async (updatedBook: Book) => {
+  const token = useCookie('auth_token').value
+  try {
+    const isEdit = !!updatedBook.id
+    const url = isEdit ? `/api/books/${updatedBook.id}` : `/api/books`
+
+    // English Comment: Standard API call for Create/Update
+    await $fetch(url, {
+      method: isEdit ? 'PUT' : 'POST',
+      body: updatedBook,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    await refresh()
+
+    // English Comment: Reset mode after successful save
+    if (isEdit) {
+      selectedBook.value = { ...updatedBook }
+      currentMode.value = 'view'
+    } else {
+      selectedBook.value = {} as Book
+      currentMode.value = 'view'
+    }
+  } catch (err) {
+    console.error('Save operation failed:', err)
+  }
+}
+
+const handleDelete = async (book: Book) => {
+  const token = useCookie('auth_token').value
+  if (confirm(`Are you sure you want to delete "${book.title}"?`)) {
+    try {
+      await $fetch(`/api/books/${book.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (selectedBook.value.id === book.id) {
+        selectedBook.value = {} as Book
+      }
+      await refresh()
+    } catch (err) {
+      console.error('Delete operation failed:', err)
+    }
+  }
+}
+
 definePageMeta({
   layout: 'admin'
 })
-
-/* 状态变量 */
-const isAddModalOpen = ref(false)
-
-/* 模拟全量图书数据 (Admin 会看到所有书) */
-const allBooks = ref([
-  { id: 1, title: 'The Great Gatsby', author: 'F. Scott Fitzgerald', category: 'Fiction', status: 'Available' },
-  { id: 2, title: 'Clean Code', author: 'Robert C. Martin', category: 'Technology', status: 'Borrowed' },
-  { id: 3, title: '1984', author: 'George Orwell', category: 'Fiction', status: 'Available' }
-])
-
-/* 处理编辑逻辑 */
-const handleEdit = (book) => {
-  console.log('Editing book:', book.title)
-  /* 这里以后会弹出编辑表单，并填充当前数据 */
-  alert(`Editing: ${book.title}`)
-}
-
-/* 处理删除逻辑 */
-const handleDelete = (book) => {
-  if (confirm(`Are you sure you want to delete "${book.title}"?`)) {
-    /* 模拟删除操作 */
-    allBooks.value = allBooks.value.filter(b => b.id !== book.id)
-    console.log('Deleted book ID:', book.id)
-  }
-}
 </script>

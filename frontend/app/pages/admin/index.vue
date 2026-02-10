@@ -35,19 +35,6 @@
           <span class="font-bold">Manage Books</span>
         </div>
       </UCard>
-
-      <UCard
-        class="hover:border-primary cursor-pointer transition-colors"
-        @click="navigateTo('/admin/admins')"
-      >
-        <div class="flex flex-col items-center py-4 space-y-2">
-          <UIcon
-            name="i-lucide-user-shield"
-            class="w-10 h-10 text-orange-500"
-          />
-          <span class="font-bold">Admin Management</span>
-        </div>
-      </UCard>
     </div>
   </div>
 </template>

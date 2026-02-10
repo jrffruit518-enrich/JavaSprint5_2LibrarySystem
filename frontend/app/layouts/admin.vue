@@ -1,3 +1,9 @@
+明白你的意思了。既然 Admin 本身就是 User 的一种角色，确实不需要单独的 “Admin Management”。
+
+这是优化后的侧边栏布局，删除了重复的入口，并保持了整体逻辑的简洁。
+
+📄 layouts/admin.vue
+代码段
 <template>
   <div class="min-h-screen flex flex-col">
     <header class="h-16 border-b border-default flex items-center justify-between px-6 bg-background sticky top-0 z-10">
@@ -51,22 +57,12 @@
             class="justify-start"
             active-class="bg-primary/10 text-primary font-semibold"
           />
-
-          <UButton
-            to="/admin/admins"
-            icon="i-lucide-user-cog"
-            label="Admin Management"
-            variant="ghost"
-            block
-            class="justify-start"
-            active-class="bg-primary/10 text-primary font-semibold"
-          />
         </nav>
 
         <div class="p-4 border-t border-default">
           <UButton
             label="Logout"
-            color="red"
+            color="error"
             variant="ghost"
             block
             icon="i-lucide-log-out"
@@ -83,14 +79,22 @@
   </div>
 </template>
 
-<script setup>
-/* Handle logout logic */
-const handleLogout = () => {
-  /* Clear session/cookie info */
-  const roleCookie = useCookie('user-role')
-  roleCookie.value = null
+<script setup lang="ts">
+/**
+ * 图书馆项目 (Library Project) - Admin Layout
+ * Simplified navigation to focus on core management modules.
+ */
 
-  /* Redirect to landing page */
+const handleLogout = () => {
+  // English Comment: Clear all auth-related cookies to ensure clean state
+  const roleCookie = useCookie('user-role')
+  const tokenCookie = useCookie('auth-token')
+
+  roleCookie.value = null
+  tokenCookie.value = null
+
+  console.log('User logged out, cookies cleared.')
+  // English Comment: Redirect to login page after logout
   navigateTo('/')
 }
 </script>
