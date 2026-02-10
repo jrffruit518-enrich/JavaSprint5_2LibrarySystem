@@ -3,7 +3,7 @@ package com.rongproject.JavaSprint5_2LibrarySystem.controllers;
 
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.AuthResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.LoginRequest;
-import com.rongproject.JavaSprint5_2LibrarySystem.DTO.RegisterRequest;
+import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserRegisterRequest;
 import com.rongproject.JavaSprint5_2LibrarySystem.services.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,7 +25,7 @@ public class AuthController {
 
     @Operation(summary = "Register a new user")
     @PostMapping("/register")
-    public ResponseEntity<String> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<String> register(@Valid @RequestBody UserRegisterRequest request) {
         // Handle user registration
         String result = authService.register(request);
         return ResponseEntity.ok(result);

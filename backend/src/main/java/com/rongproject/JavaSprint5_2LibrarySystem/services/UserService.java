@@ -2,7 +2,9 @@ package com.rongproject.JavaSprint5_2LibrarySystem.services;
 
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.entities.User;
+import com.rongproject.JavaSprint5_2LibrarySystem.enums.LogStatus;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.UserRole;
+import com.rongproject.JavaSprint5_2LibrarySystem.repositories.BorrowLogRepository;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -15,6 +17,7 @@ import java.util.List;
 public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final BorrowLogRepository borrowLogRepository;
 
     public UserResponse createUser(User user) {
         // 1. 基础校验：验证用户名是否存在（无论什么角色都需要验证 Name）
@@ -44,23 +47,48 @@ public class UserService {
         return mapToResponse(user);
     }
 
-    public UserResponse updateUser(Long id, User updatedUser) {
-        User userToUpdate = userRepository.findByIdOrThrow(id);
+    public UserResponse updateUser(Long targetUserId, User updatedData, String operatorRole) {
+        User userToUpdate = userRepository.findByIdOrThrow(targetUserId);
 
-        // Protection: Prevent changing the root admin's role to anything else
-        if ("admin".equals(userToUpdate.getUsername()) && !userToUpdate.getUserRole().equals(updatedUser.getUserRole())) {
-            throw new RuntimeException("The root admin's role cannot be downgraded!");
+        // 1. Root Admin Protection
+        if ("admin".equals(userToUpdate.getUsername())) {
+            if (updatedData.isEnabled() == false) {
+                throw new RuntimeException("The root admin account cannot be disabled!");
+            }
         }
 
-        userToUpdate.setUsername(updatedUser.getUsername());
-        userToUpdate.setEmail(updatedUser.getEmail());
-        userToUpdate.setUserRole(updatedUser.getUserRole());
-        userToUpdate.setEnabled(updatedUser.isEnabled());
-        userToUpdate.setAvatarUrl(updatedUser.getAvatarUrl());
+        // 2. Email & Username Uniqueness Check
+        // English Comment: Prevent changing to an email that is already taken by another user
+        if (updatedData.getEmail() != null && !updatedData.getEmail().equals(userToUpdate.getEmail())) {
+            if (userRepository.existsByEmail(updatedData.getEmail())) {
+                throw new IllegalStateException("Email is already in use: " + updatedData.getEmail());
+            }
+        }
 
-        // English Comment: If password change is allowed in this flow, encode it
-        if (updatedUser.getPassword() != null && !updatedUser.getPassword().isEmpty()) {
-            userToUpdate.setPassword(passwordEncoder.encode(updatedUser.getPassword()));
+        // English Comment: Prevent changing to a username that is already taken (if your logic allows username change)
+        if (updatedData.getUsername() != null && !updatedData.getUsername().equals(userToUpdate.getUsername())) {
+            if (userRepository.existsByUsername(updatedData.getUsername())) {
+                throw new IllegalStateException("Username is already taken: " + updatedData.getUsername());
+            }
+        }
+
+        // 3. Logic for Admin Operator
+        if ("ADMIN".equals(operatorRole)) {
+            userToUpdate.setEnabled(updatedData.isEnabled());
+            userToUpdate.setManualLock(!updatedData.isEnabled());
+
+            // English Comment: Admin can also update username/email if necessary
+            userToUpdate.setUsername(updatedData.getUsername());
+            userToUpdate.setEmail(updatedData.getEmail());
+        }
+        // 4. Logic for Regular User Operator
+        else {
+            userToUpdate.setEmail(updatedData.getEmail());
+            userToUpdate.setAvatarUrl(updatedData.getAvatarUrl());
+
+            if (updatedData.getPassword() != null && !updatedData.getPassword().isEmpty()) {
+                userToUpdate.setPassword(passwordEncoder.encode(updatedData.getPassword()));
+            }
         }
 
         User savedUser = userRepository.save(userToUpdate);
@@ -76,11 +104,22 @@ public class UserService {
 
     public void deleteUser(Long id) {
         User userToDelete = userRepository.findByIdOrThrow(id);
-        // Protection logic: Root admin account cannot be deleted
+
+        // 1. Protection logic: Root admin account cannot be deleted
+        // English Comment: Prevent deletion of the system's primary administrator
         if ("admin".equals(userToDelete.getUsername())) {
             throw new RuntimeException("The root admin account cannot be deleted!");
         }
 
+        // 2. Borrowing status check: Query MongoDB to see if user has unreturned books
+        // English Comment: Check if the user has any active borrowing records in MongoDB
+        boolean hasActiveLoans = borrowLogRepository.existsByUserIdAndStatus(id, LogStatus.BORROWED);
+
+        if (hasActiveLoans) {
+            throw new RuntimeException("Cannot delete user: This user still has unreturned books.");
+        }
+
+        // 3. If all checks pass, proceed with deletion in MySQL
         userRepository.deleteById(id);
     }
 
@@ -91,6 +130,7 @@ public class UserService {
                 user.getEmail(),
                 user.getUserRole(),
                 user.isEnabled(),
+                user.isManualLock(),
                 user.getAvatarUrl());
     }
 }

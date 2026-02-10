@@ -4,14 +4,18 @@ import com.rongproject.JavaSprint5_2LibrarySystem.DTO.LogResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.BorrowOperationRequest;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserStatusResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.services.BorrowingService;
+
+// Swagger 注解：仅用于描述文档
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+
+// Spring 注解：用于实际业务处理（核心！）
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.*; // 包含了 @RestController, @PostMapping 等
+import org.springframework.web.bind.annotation.RequestBody; // 必须用这个！
 
 @RestController
 @RequestMapping("/borrow")

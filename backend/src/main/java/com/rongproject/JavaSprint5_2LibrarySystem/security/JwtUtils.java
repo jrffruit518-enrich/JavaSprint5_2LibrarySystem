@@ -1,4 +1,4 @@
-package com.rongproject.JavaSprint5_2LibrarySystem.configs;
+package com.rongproject.JavaSprint5_2LibrarySystem.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;

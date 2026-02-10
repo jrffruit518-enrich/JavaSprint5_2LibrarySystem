@@ -27,4 +27,9 @@ public interface BorrowLogRepository extends MongoRepository<BorrowLog,String> {
     BorrowLog findByIdOrThrow(String id);
 
     List<BorrowLog> findByUserId(Long id);
+
+    boolean existsByUserIdAndStatus(Long id,LogStatus logStatus);
+
+    // English Comment: Check if a specific book is currently out on loan
+    boolean existsByBookIdAndStatus(Long bookId, LogStatus status);
 }

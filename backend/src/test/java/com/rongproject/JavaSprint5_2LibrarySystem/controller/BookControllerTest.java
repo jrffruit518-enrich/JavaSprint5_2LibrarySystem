@@ -3,7 +3,7 @@ package com.rongproject.JavaSprint5_2LibrarySystem.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.BookCreationRequest;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.BookResponse;
-import com.rongproject.JavaSprint5_2LibrarySystem.configs.SecurityConfig;
+import com.rongproject.JavaSprint5_2LibrarySystem.security.SecurityConfig;
 import com.rongproject.JavaSprint5_2LibrarySystem.controllers.BookController;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.BookGenre;
 import com.rongproject.JavaSprint5_2LibrarySystem.services.BookService;

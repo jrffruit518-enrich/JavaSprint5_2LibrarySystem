@@ -1,4 +1,4 @@
-package com.rongproject.JavaSprint5_2LibrarySystem.configs;
+package com.rongproject.JavaSprint5_2LibrarySystem.security;
 
 
 import com.rongproject.JavaSprint5_2LibrarySystem.services.CustomUserDetailsService;

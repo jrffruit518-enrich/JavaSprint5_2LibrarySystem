@@ -3,7 +3,10 @@ package com.rongproject.JavaSprint5_2LibrarySystem.services;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.BookCreationRequest;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.BookResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.entities.Book;
+import com.rongproject.JavaSprint5_2LibrarySystem.entities.BorrowLog;
+import com.rongproject.JavaSprint5_2LibrarySystem.enums.LogStatus;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.BookRepository;
+import com.rongproject.JavaSprint5_2LibrarySystem.repositories.BorrowLogRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +18,7 @@ import java.util.stream.Collectors;
 public class BookService {
 
     private final BookRepository bookRepository;
+    private final BorrowLogRepository borrowLogRepository;
 
     public BookResponse createBook(BookCreationRequest request) {
         // Validation: Prevent duplicate ISBN
@@ -72,7 +76,18 @@ public class BookService {
     }
 
     public void deleteBook(Long id) {
+        // 1. Validate if the book exists
         Book book = bookRepository.getBookById(id);
+
+        // 2. Cross-DB validation: Check MongoDB for any active borrowing records
+        // English Comment: Prevent deletion if any user is currently holding this book
+        boolean isBeingBorrowed = borrowLogRepository.existsByBookIdAndStatus(id, LogStatus.BORROWED);
+
+        if (isBeingBorrowed) {
+            throw new RuntimeException("Cannot delete book: This book is currently borrowed by a user.");
+        }
+
+        // 3. Proceed with deletion in MySQL only if no active logs exist
         bookRepository.delete(book);
     }
 

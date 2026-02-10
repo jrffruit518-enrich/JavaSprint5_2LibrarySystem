@@ -35,5 +35,10 @@ public class User {
     @Builder.Default
     private boolean enabled = true;
 
+    // English Comment: If true, only an admin can unlock this account.
+// System automation will skip users with manualLock = true.
+    @Column(nullable = false)
+    private boolean manualLock = false;
+
     private String avatarUrl;
 }

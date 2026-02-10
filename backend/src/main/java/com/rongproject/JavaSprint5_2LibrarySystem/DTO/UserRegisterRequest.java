@@ -9,7 +9,7 @@ import jakarta.validation.constraints.Size;
  * Data Transfer Object for new user registration.
  */
 @Schema(description = "Request body for registering a new user account")
-public record RegisterRequest(
+public record UserRegisterRequest(
         @Schema(description = "Unique username for the account", example = "library_user_01", minLength = 3, maxLength = 50)
         @NotBlank @Size(min = 3, max = 50)
         String username,
@@ -20,5 +20,9 @@ public record RegisterRequest(
 
         @Schema(description = "Valid email address for notifications and recovery", example = "user@example.com")
         @NotBlank @Email
-        String email
-) {}
+        String email,
+
+        @Schema(description = "Optional profile picture URL", example = "https://example.com/avatar.png")
+        String avatarUrl
+) {
+}

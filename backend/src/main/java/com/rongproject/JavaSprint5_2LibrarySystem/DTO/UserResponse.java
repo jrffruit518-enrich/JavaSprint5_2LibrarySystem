@@ -23,6 +23,10 @@ public record UserResponse(
         @Schema(description = "Whether the account is currently active and allowed to borrow", example = "true")
         boolean enabled,
 
+        // English Comment: If true, the account was locked by an Admin and won't be auto-unlocked by returning books
+        @Schema(description = "Manual lock status. If true, only an Admin can unlock this account.", example = "false")
+        boolean manualLock,
+
         @Schema(description = "The URL of the user's profile picture", example = "https://example.com/avatars/user5.png")
         String avatarUrl
 ) {}

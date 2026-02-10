@@ -2,11 +2,11 @@ package com.rongproject.JavaSprint5_2LibrarySystem.services;
 
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.AuthResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.LoginRequest;
-import com.rongproject.JavaSprint5_2LibrarySystem.DTO.RegisterRequest;
+import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserRegisterRequest;
 import com.rongproject.JavaSprint5_2LibrarySystem.entities.User;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.UserRole;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.UserRepository;
-import com.rongproject.JavaSprint5_2LibrarySystem.configs.JwtUtils;
+import com.rongproject.JavaSprint5_2LibrarySystem.security.JwtUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -26,7 +26,7 @@ public class AuthService {
      * @return Success message
      */
     @Transactional
-    public String register(RegisterRequest request) {
+    public String register(UserRegisterRequest request) {
         // 1. Check if username or email already exists
         if (userRepository.existsByUsername(request.username())) {
             throw new RuntimeException("Error: Username is already taken!");
