@@ -94,19 +94,32 @@ public class BorrowLogServiceTest {
     @DisplayName("returnBook - Success Scenario")
     void returnBook_Success() {
         // English Comment: Arrange
+        // 1. Mock the initial validation calls
         when(userRepository.findByIdOrThrow(1L)).thenReturn(mockUser);
         when(bookRepository.getBookById(10L)).thenReturn(mockBook);
+
+        // 2. Mock the log retrieval
         when(borrowLogRepository.findFirstByUserIdAndBookIdAndStatusOrderByBorrowDateDesc(1L, 10L, LogStatus.BORROWED))
                 .thenReturn(Optional.of(mockLog));
         when(borrowLogRepository.save(any(BorrowLog.class))).thenReturn(mockLog);
+
+        // 3. 【关键修复】Mock 内部 updateUserStatusAfterReturn 调用的 findById
+        // English Comment: Service calls userRepository.findById() during the status refresh logic
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser));
+
+        // 4. Mock the status checking logic (if these are called in updateUserStatusAfterReturn)
+        when(borrowLogRepository.existsByUserIdAndStatusAndBorrowDateBefore(anyLong(), any(), any())).thenReturn(false);
+        when(borrowLogRepository.countByUserIdAndStatus(anyLong(), any())).thenReturn(0L);
 
         // English Comment: Act
         LogResponse response = borrowingService.returnBook(1L, 10L);
 
         // English Comment: Assert
         assertEquals(LogStatus.RETURNED, mockLog.getStatus());
-        assertEquals(3, mockBook.getAvailableStock()); // Stock: 2 -> 3
+        assertEquals(3, mockBook.getAvailableStock());
         verify(bookRepository).save(mockBook);
+        // English Comment: Verify user status was potentially updated and saved
+        verify(userRepository, atLeastOnce()).save(mockUser);
     }
 
     // --- 3. updateBorrowDateForDemo (The Accelerator) ---

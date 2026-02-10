@@ -2,6 +2,7 @@ package com.rongproject.JavaSprint5_2LibrarySystem.services;
 
 import com.rongproject.JavaSprint5_2LibrarySystem.entities.User;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.UserRepository;
+import com.rongproject.JavaSprint5_2LibrarySystem.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -19,15 +20,10 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        // 1. 从数据库查找用户
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + username));
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
-        // 2. 将我们的 User 实体转换为 Spring Security 的 UserDetails 对象
-        return new org.springframework.security.core.userdetails.User(
-                user.getUsername(),
-                user.getPassword(),
-                Collections.singletonList(new SimpleGrantedAuthority(user.getUserRole().name()))
-        );
+        // English Comment: Return our custom object that contains the userId
+        return new CustomUserDetails(user);
     }
 }

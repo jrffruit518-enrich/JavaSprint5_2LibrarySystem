@@ -2,6 +2,7 @@ package com.rongproject.JavaSprint5_2LibrarySystem.repositories;
 
 import com.rongproject.JavaSprint5_2LibrarySystem.entities.Book;
 import com.rongproject.JavaSprint5_2LibrarySystem.exceptions.ResourceNotFoundException;
+import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -20,10 +21,16 @@ public interface BookRepository extends JpaRepository<Book,Long> {
                 .orElseThrow(() -> new ResourceNotFoundException("Book not found with ID: " + id));
     }
 
-    @Modifying
-    @Query("UPDATE Book b SET b.stock = b.stock - 1 WHERE b.id = :bookId AND b.stock > 0")
-// English Comment: Atomically decrement stock if it's greater than 0.
-// Returns the number of affected rows (1 if success, 0 if out of stock).
+    @Transactional // 写入操作必须开启事务
+    @Modifying    // 通知 JPA 这是一个更新操作
+    @Query("UPDATE Book b SET b.availableStock = b.availableStock - 1 WHERE b.id = :bookId AND b.availableStock > 0")
+        // English Comment: Atomically decrement availableStock if it's greater than 0.
     int decrementStock(@Param("bookId") Long bookId);
+
+    @Transactional
+    @Modifying
+    @Query("UPDATE Book b SET b.availableStock = b.availableStock + 1 WHERE b.id = :bookId")
+        // English Comment: Increment availableStock when a book is returned.
+    int incrementStock(@Param("bookId") Long bookId);
 
 }

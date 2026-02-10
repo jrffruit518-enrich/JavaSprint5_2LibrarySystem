@@ -1,28 +1,57 @@
 package com.rongproject.JavaSprint5_2LibrarySystem.controllers;
 
+import com.rongproject.JavaSprint5_2LibrarySystem.security.CustomUserDetails;
+import com.rongproject.JavaSprint5_2LibrarySystem.services.CustomUserDetailsService;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.LogResponse;
-import com.rongproject.JavaSprint5_2LibrarySystem.DTO.BorrowOperationRequest;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserStatusResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.services.BorrowingService;
-
-// Swagger 注解：仅用于描述文档
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
-
-// Spring 注解：用于实际业务处理（核心！）
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*; // 包含了 @RestController, @PostMapping 等
-import org.springframework.web.bind.annotation.RequestBody; // 必须用这个！
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/borrow")
+@RequestMapping("/api/borrowings")
 @RequiredArgsConstructor
+@Tag(name = "Borrowing Management", description = "Endpoints for borrowing and returning books")
 public class BorrowingController {
 
     private final BorrowingService borrowingService;
+
+    @PostMapping("/borrow/{bookId}")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @Operation(summary = "Borrow a book")
+    public ResponseEntity<LogResponse> borrowBook(
+            @PathVariable Long bookId,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+
+        // English Comment: Extract the numeric userId from the security context
+        Long userId = userDetails.getId();
+        LogResponse response = borrowingService.borrowBook(userId, bookId);
+
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+
+    @PostMapping("/return/{bookId}")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @Operation(summary = "Return a book")
+    public ResponseEntity<LogResponse> returnBook(
+            @PathVariable Long bookId,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+
+        // English Comment: Service requires both userId and bookId to locate the log and update stock
+        Long userId = userDetails.getId();
+        LogResponse response = borrowingService.returnBook(userId, bookId);
+
+        return ResponseEntity.ok(response);
+    }
 
     @Operation(
             summary = "Get user borrowing eligibility",
@@ -37,15 +66,6 @@ public class BorrowingController {
             @Parameter(description = "The ID of the user to check", example = "5")
             @PathVariable Long userId) {
         return ResponseEntity.ok(borrowingService.getUserBorrowingStatus(userId));
-    }
-
-    @Operation(
-            summary = "Return a book",
-            description = "Returns a borrowed book, updates stock, and checks if user status can be restored."
-    )
-    @PostMapping("/return")
-    public ResponseEntity<LogResponse> returnBook(@RequestBody BorrowOperationRequest request) {
-        return ResponseEntity.ok(borrowingService.returnBook(request.userId(), request.bookId()));
     }
 
 

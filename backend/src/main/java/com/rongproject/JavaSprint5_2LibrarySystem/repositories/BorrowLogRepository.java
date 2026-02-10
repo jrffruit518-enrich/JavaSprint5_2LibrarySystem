@@ -24,7 +24,6 @@ public interface BorrowLogRepository extends MongoRepository<BorrowLog,String> {
 
     Optional<BorrowLog> findByUserIdAndBookIdAndStatus(Long userId, Long bookId, LogStatus status);
 
-    BorrowLog findByIdOrThrow(String id);
 
     List<BorrowLog> findByUserId(Long id);
 

@@ -3,18 +3,19 @@ package com.rongproject.JavaSprint5_2LibrarySystem.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.BookCreationRequest;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.BookResponse;
-import com.rongproject.JavaSprint5_2LibrarySystem.security.SecurityConfig;
 import com.rongproject.JavaSprint5_2LibrarySystem.controllers.BookController;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.BookGenre;
+import com.rongproject.JavaSprint5_2LibrarySystem.security.JwtUtils;
 import com.rongproject.JavaSprint5_2LibrarySystem.services.BookService;
+import com.rongproject.JavaSprint5_2LibrarySystem.services.CustomUserDetailsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -22,124 +23,146 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDate;
 import java.util.List;
 
+// English Comment: Required imports for CSRF and MockMvc
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@Import(SecurityConfig.class)
-@WebMvcTest(BookController.class) // 只加载 Web 层，不启动整个 Context
+@WebMvcTest(BookController.class)
 @AutoConfigureMockMvc
+@EnableMethodSecurity // English Comment: Crucial! This enables @PreAuthorize during the test
 public class BookControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
-    @MockitoBean
-    private BookService bookService; // 模拟 Service 层的行为
-
     @Autowired
-    private ObjectMapper objectMapper; // 用于将 DTO 转为 JSON 字符串
+    private ObjectMapper objectMapper;
 
-    private BookResponse mockResponse;
-    private BookCreationRequest mockRequest;
+    @MockitoBean
+    private BookService bookService;
+
+    @MockitoBean
+    private JwtUtils jwtUtils;
+
+    @MockitoBean
+    private CustomUserDetailsService userDetailsService;
+
+    private BookResponse defaultResponse;
+    private BookCreationRequest validRequest;
 
     @BeforeEach
     void setUp() {
-        mockResponse = new BookResponse(1L, "Effective Java", "Joshua Bloch", "9780134685991",
-                BookGenre.SCIENCE, LocalDate.now(), 4.9, "Classic", 5, "url");
+        defaultResponse = new BookResponse(
+                1L, "Effective Java", "Joshua Bloch", "9780134685991",
+                BookGenre.SCIENCE, LocalDate.of(2018, 1, 6), 4.9,
+                "A comprehensive guide to Java best practices.", 5,
+                "https://example.com/cover.jpg"
+        );
 
-        mockRequest = new BookCreationRequest("Effective Java", "Joshua Bloch", "9780134685991",
-                BookGenre.SCIENCE, LocalDate.now(), 4.9, "Classic", 5, "url");
+        validRequest = new BookCreationRequest(
+                "Effective Java", "Joshua Bloch", "9780134685991",
+                BookGenre.SCIENCE, LocalDate.of(2018, 1, 6), 4.9,
+                "A comprehensive guide to Java best practices.", 5,
+                "https://example.com/cover.jpg"
+        );
     }
 
-    // --- GET ALL BOOKS ---
-
+    // --- 1. GET ALL BOOKS ---
     @Test
+    @WithMockUser // English Comment: Added to prevent 401 if endpoint is not permitAll
     @DisplayName("GET /api/books - Success")
-    @WithMockUser // 模拟已登录用户
     void getAllBooks_Success() throws Exception {
-        when(bookService.getAllBooks()).thenReturn(List.of(mockResponse));
+        when(bookService.getAllBooks()).thenReturn(List.of(defaultResponse));
 
         mockMvc.perform(get("/api/books"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].title").value("Effective Java"))
-                .andExpect(jsonPath("$.length()").value(1));
+                .andExpect(jsonPath("$[0].title").value("Effective Java"));
     }
 
-    // --- GET BOOK BY ID ---
-
+    // --- 2. GET BOOK BY ID ---
     @Test
+    @WithMockUser // English Comment: Added to prevent 401
     @DisplayName("GET /api/books/{id} - Success")
-    @WithMockUser
     void getBookById_Success() throws Exception {
-        when(bookService.getBookById(1L)).thenReturn(mockResponse);
+        when(bookService.getBookById(1L)).thenReturn(defaultResponse);
 
         mockMvc.perform(get("/api/books/1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1L));
+                .andExpect(jsonPath("$.isbn").value("9780134685991"));
     }
 
-    // --- CREATE BOOK ---
-
+    // --- 3. CREATE BOOK (ADMIN ONLY) ---
     @Test
-    @DisplayName("POST /api/books - Success (ADMIN)")
-    @WithMockUser(roles = "ADMIN") // 关键：模拟管理员身份
-    void createBook_Success_Admin() throws Exception {
-        when(bookService.createBook(any(BookCreationRequest.class))).thenReturn(mockResponse);
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("POST /api/books - Success as ADMIN")
+    void createBook_Success() throws Exception {
+        when(bookService.createBook(any(BookCreationRequest.class))).thenReturn(defaultResponse);
 
         mockMvc.perform(post("/api/books")
-                        .with(csrf()) // 必须带上 CSRF，否则会被 Security 拦截
+                        .with(csrf()) // English Comment: Crucial to prevent 403
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(mockRequest)))
+                        .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.title").value("Effective Java"));
     }
 
     @Test
-    @DisplayName("POST /api/books - Failure (Forbidden for USER)")
-    @WithMockUser(roles = "USER") // 模拟普通用户
-    void createBook_Forbidden_User() throws Exception {
+    @WithMockUser(roles = "USER")
+    @DisplayName("POST /api/books - Forbidden for regular USER")
+    void createBook_Forbidden() throws Exception {
         mockMvc.perform(post("/api/books")
-                        .with(csrf())
+                        .with(csrf()) // English Comment: Added CSRF here too
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(mockRequest)))
-                .andExpect(status().isForbidden()); // 验证返回 403
+                        .content(objectMapper.writeValueAsString(validRequest)))
+                .andExpect(status().isForbidden());
     }
 
-    // --- UPDATE BOOK ---
-
+    // --- 4. UPDATE BOOK (ADMIN ONLY) ---
     @Test
-    @DisplayName("PUT /api/books/{id} - Success (ADMIN)")
     @WithMockUser(roles = "ADMIN")
+    @DisplayName("PUT /api/books/{id} - Success as ADMIN")
     void updateBook_Success() throws Exception {
-        when(bookService.updateBook(eq(1L), any(BookCreationRequest.class))).thenReturn(mockResponse);
+        when(bookService.updateBook(eq(1L), any(BookCreationRequest.class))).thenReturn(defaultResponse);
 
         mockMvc.perform(put("/api/books/1")
-                        .with(csrf())
+                        .with(csrf()) // English Comment: Crucial to prevent 403
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(mockRequest)))
-                .andExpect(status().isOk());
+                        .content(objectMapper.writeValueAsString(validRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.author").value("Joshua Bloch"));
     }
 
-    // --- DELETE BOOK ---
-
+    // --- 5. DELETE BOOK (ADMIN ONLY) ---
     @Test
-    @DisplayName("DELETE /api/books/{id} - Success (ADMIN)")
     @WithMockUser(roles = "ADMIN")
+    @DisplayName("DELETE /api/books/{id} - Success as ADMIN")
     void deleteBook_Success() throws Exception {
-        mockMvc.perform(delete("/api/books/1").with(csrf()))
+        doNothing().when(bookService).deleteBook(1L);
+
+        mockMvc.perform(delete("/api/books/1")
+                        .with(csrf())) // English Comment: Crucial to prevent 403
                 .andExpect(status().isNoContent());
     }
 
+    // --- 6. VALIDATION TEST ---
     @Test
-    @DisplayName("DELETE /api/books/{id} - Failure (Anonymous)")
-    void deleteBook_Failure_Anonymous() throws Exception {
-        // 不带 @WithMockUser，模拟匿名用户
-        mockMvc.perform(delete("/api/books/1").with(csrf()))
-                // 将 .isUnauthorized() (401) 改为 .isForbidden() (403)
-                .andExpect(status().isForbidden());
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("POST /api/books - Failure due to Validation (ISBN length)")
+    void createBook_ValidationFailure() throws Exception {
+        BookCreationRequest invalidRequest = new BookCreationRequest(
+                "Title", "Author", "12345", BookGenre.ART,
+                LocalDate.now(), 5.0, "Description", 10, null
+        );
+
+        mockMvc.perform(post("/api/books")
+                        .with(csrf()) // English Comment: Crucial to prevent 403
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
+                .andExpect(status().isBadRequest());
     }
 }

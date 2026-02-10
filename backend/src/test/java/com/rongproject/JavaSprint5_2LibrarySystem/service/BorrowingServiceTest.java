@@ -102,24 +102,38 @@ public class BorrowingServiceTest {
     @Test
     @DisplayName("returnBook - Success and Auto-Unlock")
     void returnBook_Success() {
+        // 1. Mock 初始的校验
         when(userRepository.findByIdOrThrow(1L)).thenReturn(mockUser);
         when(bookRepository.getBookById(100L)).thenReturn(mockBook);
 
-        BorrowLog activeLog = BorrowLog.builder().id("id").status(LogStatus.BORROWED).build();
+        // 2. Mock 查找借书记录
+        BorrowLog activeLog = BorrowLog.builder()
+                .userId(1L) // 建议加上 userId
+                .bookId(100L)
+                .status(LogStatus.BORROWED)
+                .build();
         when(borrowLogRepository.findFirstByUserIdAndBookIdAndStatusOrderByBorrowDateDesc(anyLong(), anyLong(), any()))
                 .thenReturn(Optional.of(activeLog));
         when(borrowLogRepository.save(any())).thenReturn(activeLog);
 
-        // English Comment: Mock status check after return (user has no more overdues)
+        // 3. 关键点：Mock 在 updateUserStatusAfterReturn 方法中调用的 findById
+        // English Comment: The service calls userRepository.findById() during the status update after return.
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser));
+
+        // 4. Mock 状态检查逻辑
         when(borrowLogRepository.existsByUserIdAndStatusAndBorrowDateBefore(anyLong(), any(), any())).thenReturn(false);
         when(borrowLogRepository.countByUserIdAndStatus(anyLong(), any())).thenReturn(0L);
 
+        // Act
         LogResponse result = borrowingService.returnBook(1L, 100L);
 
-        // English Comment: Assert status change and stock recovery
+        // Assert
         assertEquals(LogStatus.RETURNED, activeLog.getStatus());
-        assertEquals(6, mockBook.getAvailableStock());
+        assertEquals(6, mockBook.getAvailableStock()); // 原本是 5，还书后变 6
         verify(bookRepository).save(mockBook);
+
+        // English Comment: Verify that user was saved if status was updated
+        verify(userRepository, atLeastOnce()).save(mockUser);
     }
 
     // --- 3. getUserBorrowingStatus & Manual Lock Tests ---

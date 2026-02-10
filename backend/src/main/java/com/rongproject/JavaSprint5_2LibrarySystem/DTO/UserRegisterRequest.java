@@ -1,5 +1,6 @@
 package com.rongproject.JavaSprint5_2LibrarySystem.DTO;
 
+import com.rongproject.JavaSprint5_2LibrarySystem.entities.User;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -25,4 +26,15 @@ public record UserRegisterRequest(
         @Schema(description = "Optional profile picture URL", example = "https://example.com/avatar.png")
         String avatarUrl
 ) {
+        // English Comment: Converts the registration DTO to a User entity for persistence
+        public User toEntity() {
+                User user = new User();
+                user.setUsername(this.username);
+                user.setPassword(this.password); // Password encoding must still be handled in Service
+                user.setEmail(this.email);
+                user.setAvatarUrl(this.avatarUrl);
+                // English Comment: Default properties like enabled=true are usually set here or in the DB schema
+                user.setEnabled(true);
+                return user;
+        }
 }

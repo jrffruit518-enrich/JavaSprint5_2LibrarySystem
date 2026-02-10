@@ -5,6 +5,7 @@ import com.rongproject.JavaSprint5_2LibrarySystem.entities.Book;
 import com.rongproject.JavaSprint5_2LibrarySystem.entities.BorrowLog;
 import com.rongproject.JavaSprint5_2LibrarySystem.entities.User;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.LogStatus;
+import com.rongproject.JavaSprint5_2LibrarySystem.exceptions.ResourceNotFoundException;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.BookRepository;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.BorrowLogRepository;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.UserRepository;
@@ -100,11 +101,15 @@ public class BorrowLogService {
                 .toList();
     }
 
+    // English Comment: Service method to update date for demonstration purposes
     public LogResponse updateBorrowDateForDemo(String recordId, LocalDateTime newBorrowDate) {
-        BorrowLog record = borrowLogRepository.findByIdOrThrow(recordId);
+        // English Comment: Use the standard findById and throw exception manually
+        BorrowLog record = borrowLogRepository.findById(recordId)
+                .orElseThrow(() -> new ResourceNotFoundException("Log not found with id: " + recordId));
+
         record.setBorrowDate(newBorrowDate);
 
-        // 如果你的逻辑是根据日期动态判断，这里修改后，下一次查询就会触发禁用逻辑
+        // English Comment: Save the updated record and map to response
         return mapToResponse(borrowLogRepository.save(record));
     }
 
