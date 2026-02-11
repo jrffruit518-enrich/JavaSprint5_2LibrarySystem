@@ -1,11 +1,11 @@
 <template>
   <div class="space-y-8">
     <div>
-      <h1 class="text-2xl font-bold">
+      <h1 class="text-2xl font-bold text-highlighted">
         Hello, Reader!
       </h1>
       <p class="text-muted">
-        Keep track of your reading journey here.
+        Welcome back to your reading dashboard.
       </p>
     </div>
 
@@ -15,28 +15,30 @@
           <p class="text-sm text-muted mb-1">
             Books Borrowed
           </p>
-          <p class="text-3xl font-bold">
-            3
+          <p class="text-3xl font-bold text-highlighted">
+            {{ stats.borrowed }}
           </p>
         </div>
       </UCard>
+
       <UCard>
         <div class="text-center">
           <p class="text-sm text-muted mb-1">
             Active Reservations
           </p>
           <p class="text-3xl font-bold text-primary">
-            1
+            {{ stats.reservations }}
           </p>
         </div>
       </UCard>
+
       <UCard>
         <div class="text-center">
           <p class="text-sm text-muted mb-1">
             Overdue Notices
           </p>
           <p class="text-3xl font-bold text-red-500">
-            0
+            {{ stats.overdue }}
           </p>
         </div>
       </UCard>
@@ -45,8 +47,21 @@
 </template>
 
 <script setup>
-/* Apply user layout */
+import { reactive } from 'vue'
+
+/**
+ * User Dashboard Page
+ * Layout: user
+ */
 definePageMeta({
-  layout: 'user'
+  layout: 'user',
+  middleware: 'auth'
+})
+
+// Mock data for now, fetch from API later
+const stats = reactive({
+  borrowed: 0,
+  reservations: 0,
+  overdue: 0
 })
 </script>

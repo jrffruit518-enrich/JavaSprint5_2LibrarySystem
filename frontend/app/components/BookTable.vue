@@ -94,7 +94,7 @@ import type { Book } from '~/types/book'
 const props = defineProps<{
   data: Book[]
   loading?: boolean
-  role: 'admin' | 'guest'
+  role: 'admin' | 'guest' | 'user'
 }>()
 
 // English Comment: Explicitly define emit types for better IDE support and type safety

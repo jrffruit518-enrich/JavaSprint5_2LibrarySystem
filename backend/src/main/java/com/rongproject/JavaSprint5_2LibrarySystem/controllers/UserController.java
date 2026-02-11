@@ -1,9 +1,6 @@
 package com.rongproject.JavaSprint5_2LibrarySystem.controllers;
 
-import com.rongproject.JavaSprint5_2LibrarySystem.DTO.LogResponse;
-import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserProfileRequest;
-import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserRegisterRequest;
-import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserResponse;
+import com.rongproject.JavaSprint5_2LibrarySystem.DTO.*;
 import com.rongproject.JavaSprint5_2LibrarySystem.entities.User;
 import com.rongproject.JavaSprint5_2LibrarySystem.security.CustomUserDetails;
 import com.rongproject.JavaSprint5_2LibrarySystem.security.SecurityUtils;
@@ -18,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -91,6 +89,44 @@ public class UserController {
         Long currentUserId = userDetails.getId();
         return ResponseEntity.ok(userService.updateUser(currentUserId, request.toEntity(), "USER"));
     }
+
+    // Java - UserController.java
+    @GetMapping("/me")
+    public ResponseEntity<UserResponse> getSelf(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        // 诊断 1: 请求是否到达了 Controller
+        System.out.println(">>> [DIAGNOSTIC] Request reached /api/users/me");
+
+        // 诊断 2: Security 上下文是否正确提取了用户
+        if (userDetails == null) {
+            System.err.println(">>> [DIAGNOSTIC] Error: userDetails is NULL. Authentication failed or Principal type mismatch.");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        System.out.println(">>> [DIAGNOSTIC] Authenticated User ID: " + userDetails.getId());
+        System.out.println(">>> [DIAGNOSTIC] Authenticated Username: " + userDetails.getUsername());
+
+        try {
+            // 诊断 3: 调用 Service 层前
+            UserResponse response = userService.getUserById(userDetails.getId());
+            System.out.println(">>> [DIAGNOSTIC] Service call successful. Data: " + response);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            // 诊断 4: 捕获 Service 层具体崩溃原因
+            System.err.println(">>> [DIAGNOSTIC] Service layer CRASHED!");
+            e.printStackTrace(); // 这会在控制台打印完整的错误堆栈
+            throw e;
+        }
+    }
+
+    @GetMapping("/profile")
+    public ResponseEntity<UserProfileDTO> getUserProfile() {
+        // Get username from Spring Security context
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+
+        UserProfileDTO profile = userService.getProfileByUsername(currentUsername);
+        return ResponseEntity.ok(profile);
+    }
+
 
     // --- 4. 演示辅助工具 (Demo Tools) ---
 

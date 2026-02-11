@@ -1,9 +1,11 @@
 package com.rongproject.JavaSprint5_2LibrarySystem.services;
 
+import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserProfileDTO;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.entities.User;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.LogStatus;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.UserRole;
+import com.rongproject.JavaSprint5_2LibrarySystem.exceptions.ResourceNotFoundException;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.BorrowLogRepository;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -121,6 +123,22 @@ public class UserService {
 
         // 3. If all checks pass, proceed with deletion in MySQL
         userRepository.deleteById(id);
+    }
+
+    public UserProfileDTO getProfileByUsername(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+    /* Convert Entity to Record DTO using the canonical constructor.
+       Mapping all required fields from the User entity.
+    */
+        return new UserProfileDTO(
+                user.getId(),
+                user.getUsername(),
+                user.getEmail(),
+                user.getUserRole(),   // Ensure this field exists in your User entity
+                user.getAvatarUrl()   // Ensure this field exists in your User entity
+        );
     }
 
     private UserResponse mapToResponse(User user) {

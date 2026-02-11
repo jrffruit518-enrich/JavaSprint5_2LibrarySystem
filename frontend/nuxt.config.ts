@@ -12,13 +12,9 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
-  // --- Runtime Config (Handles Environment Variables) ---
+  // --- Runtime Config ---
   runtimeConfig: {
     public: {
-      /**
-       * Default value for local development.
-       * Will be overridden by NUXT_PUBLIC_API_BASE in .env or Docker.
-       */
       apiBase: 'http://localhost:8080'
     }
   },
@@ -28,6 +24,21 @@ export default defineNuxtConfig({
   },
 
   compatibilityDate: '2025-01-15',
+
+  // --- NEW: Nitro Proxy Configuration ---
+  // English Comment: Standard transparent proxy for local development
+  nitro: {
+    devProxy: {
+      // 这里的 '/api' 是前端请求的匹配前缀
+      '/api': {
+        // target 只写到端口，不要带路径
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        // English Comment: Do NOT rewrite the path, keep /api/users/me as is
+        prependPath: true
+      }
+    }
+  },
 
   eslint: {
     config: {

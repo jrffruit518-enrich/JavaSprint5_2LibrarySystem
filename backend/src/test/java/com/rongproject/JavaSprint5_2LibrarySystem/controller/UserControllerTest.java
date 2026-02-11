@@ -1,5 +1,6 @@
 package com.rongproject.JavaSprint5_2LibrarySystem.controller;
 
+import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserProfileDTO;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserProfileRequest;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserRegisterRequest;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserResponse;
@@ -168,5 +169,30 @@ public class UserControllerTest {
         mockMvc.perform(get("/api/users/1")
                         .with(user(userPrincipal)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "john_doe") // Mocks the authenticated user
+    @DisplayName("Should return 200 OK and user profile data")
+    void getUserProfile_ShouldReturnProfile() throws Exception {
+        // 1. Arrange: Prepare the Record DTO
+        UserProfileDTO mockProfile = new UserProfileDTO(
+                5L,
+                "john_doe",
+                "john@example.com",
+                UserRole.ROLE_USER,
+                "https://example.com/avatar.png"
+        );
+
+        when(userService.getProfileByUsername("john_doe")).thenReturn(mockProfile);
+
+        // 2. Act & Assert: Perform GET request and verify JSON content
+        mockMvc.perform(get("/api/users/profile")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(5))
+                .andExpect(jsonPath("$.username").value("john_doe"))
+                .andExpect(jsonPath("$.email").value("john@example.com"))
+                .andExpect(jsonPath("$.userRole").value("ROLE_USER"));
     }
 }

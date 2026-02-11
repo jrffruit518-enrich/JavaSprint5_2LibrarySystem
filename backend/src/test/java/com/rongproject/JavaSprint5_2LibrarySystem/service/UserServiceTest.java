@@ -1,9 +1,11 @@
 package com.rongproject.JavaSprint5_2LibrarySystem.service;
 
+import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserProfileDTO;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.entities.User;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.LogStatus;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.UserRole;
+import com.rongproject.JavaSprint5_2LibrarySystem.exceptions.ResourceNotFoundException;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.BorrowLogRepository;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.UserRepository;
 import com.rongproject.JavaSprint5_2LibrarySystem.services.UserService;
@@ -160,5 +162,41 @@ public class UserServiceTest {
 
         assertThrows(RuntimeException.class, () -> userService.deleteUser(1L));
         verify(userRepository, never()).deleteById(anyLong());
+    }
+
+    @Test
+    @DisplayName("Should return UserProfileDTO when user exists")
+    void getProfileByUsername_Success() {
+        // 1. Arrange: Create a mock User entity
+        User mockUser = new User();
+        mockUser.setId(5L);
+        mockUser.setUsername("john_doe");
+        mockUser.setEmail("john@example.com");
+        mockUser.setUserRole(UserRole.ROLE_USER);
+        mockUser.setAvatarUrl("https://example.com/avatar.png");
+
+        when(userRepository.findByUsername("john_doe")).thenReturn(Optional.of(mockUser));
+
+        // 2. Act: Call the service method
+        UserProfileDTO result = userService.getProfileByUsername("john_doe");
+
+        // 3. Assert: Verify the Record DTO contains correct data
+        assertNotNull(result);
+        assertEquals(5L, result.id());
+        assertEquals("john_doe", result.username());
+        assertEquals(UserRole.ROLE_USER, result.userRole());
+        verify(userRepository, times(1)).findByUsername("john_doe");
+    }
+
+    @Test
+    @DisplayName("Should throw exception when user is not found")
+    void getProfileByUsername_UserNotFound() {
+        // Arrange
+        when(userRepository.findByUsername("unknown")).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(ResourceNotFoundException.class, () -> {
+            userService.getProfileByUsername("unknown");
+        });
     }
 }
