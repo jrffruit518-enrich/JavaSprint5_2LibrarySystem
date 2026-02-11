@@ -22,26 +22,23 @@ public class UserService {
     private final BorrowLogRepository borrowLogRepository;
 
     public UserResponse createUser(User user) {
-        // 1. 基础校验：验证用户名是否存在（无论什么角色都需要验证 Name）
+        // 1. Global uniqueness check
         if (userRepository.existsByUsername(user.getUsername())) {
-            throw new RuntimeException("Username already exists: " + user.getUsername());
+            throw new RuntimeException("Username already exists");
         }
 
-        // 2. 针对普通用户 (USER) 的额外校验
-        // English Comment: Additional unique check for email only if the role is USER
-        if (user.getUserRole() == UserRole.ROLE_USER) {
-            if (userRepository.existsByEmail(user.getEmail())) {
-                throw new RuntimeException("Email already exists: " + user.getEmail());
-            }
+        // 2. Default role assignment if null
+        if (user.getUserRole() == null) {
+            user.setUserRole(UserRole.ROLE_USER);
         }
-        // English Comment: If role is ADMIN, only username check is needed (already done above)
-        // Passwords can be the same as per requirements, so no check needed for that.
 
-        // 3. 加密并保存
+        // 3. Email check (Usually required for all roles for password recovery)
+        if (userRepository.existsByEmail(user.getEmail())) {
+            throw new RuntimeException("Email already exists");
+        }
+
         user.setPassword(passwordEncoder.encode(user.getPassword()));
-        User savedUser = userRepository.save(user);
-
-        return mapToResponse(savedUser);
+        return mapToResponse(userRepository.save(user));
     }
     
     public UserResponse getUserById(Long id) {

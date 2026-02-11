@@ -11,11 +11,20 @@ interface ApiError {
   status?: number
 }
 
+/* Define the User Profile interface matching the Backend Record DTO */
+export interface UserProfileDTO {
+  id: number
+  username: string
+  email: string
+  userRole: 'MEMBER' | 'ADMIN' // Adjust based on your UserRole enum
+  avatarUrl: string
+}
+
 export const useApi = <T>(url: string, options: UseFetchOptions<T> = {}) => {
   const token = useCookie<string | null>('auth-token')
+
   /**
    * 1. Get runtime configuration.
-   * This allows the app to use the API address from .env or environment variables.
    */
   const config = useRuntimeConfig()
 
@@ -31,11 +40,10 @@ export const useApi = <T>(url: string, options: UseFetchOptions<T> = {}) => {
   return useFetch(url, {
     /**
      * 2. Use dynamic baseURL from runtimeConfig.
-     * It defaults to 'http://localhost:8080' as defined in nuxt.config.ts.
      */
     baseURL: config.public.apiBase,
 
-    /* Manually mapping necessary options to avoid generic overload issues */
+    /* Manually mapping necessary options */
     method: options.method,
     body: options.body,
     params: options.params,
@@ -49,8 +57,6 @@ export const useApi = <T>(url: string, options: UseFetchOptions<T> = {}) => {
     /* Response error handling */
     onResponseError({ response }) {
       const status = response.status
-
-      /* Use unknown as a bridge for safe casting instead of any */
       const errorData = response._data as unknown as ApiError
       const errorMsg = errorData?.message || 'Access Denied'
 
@@ -61,4 +67,14 @@ export const useApi = <T>(url: string, options: UseFetchOptions<T> = {}) => {
       }
     }
   } as UseFetchOptions<T>)
+}
+
+/**
+ * 3. Helper function to fetch the current user's profile.
+ * This can be used directly in profile.vue.
+ */
+export const useUserProfile = () => {
+  return useApi<UserProfileDTO>('/api/users/profile', {
+    method: 'GET'
+  })
 }

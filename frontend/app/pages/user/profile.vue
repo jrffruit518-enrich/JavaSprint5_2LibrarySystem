@@ -1,6 +1,3 @@
-这是为你加固后的完整 profile.vue 代码。我统一了请求逻辑，增强了诊断输出，并确保字段与后端的 UserResponse 和 UserProfileRequest 能够完美对齐。
-
-代码段
 <template>
   <div class="space-y-6">
     <AppBreadcrumb current-page-title="Personal Profile" />
@@ -9,6 +6,7 @@
       <UCard class="lg:col-span-1 h-fit">
         <div class="flex flex-col items-center py-8">
           <UAvatar
+            :src="user.avatarUrl"
             :alt="user.username"
             size="3xl"
             class="ring-4 ring-primary/20 text-2xl font-bold"
@@ -19,6 +17,13 @@
           <p class="text-sm text-muted font-mono mt-1">
             ID: LIB-2026-{{ String(user.id || 0).padStart(3, '0') }}
           </p>
+          <UBadge
+            class="mt-2"
+            variant="subtle"
+            color="primary"
+          >
+            {{ user.userRole }}
+          </UBadge>
         </div>
       </UCard>
 
@@ -109,8 +114,9 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { useApi, type UserProfileDTO } from '~/composables/useApi'
 
 definePageMeta({
   layout: 'user',
@@ -120,10 +126,13 @@ definePageMeta({
 const isEditing = ref(false)
 const loading = ref(false)
 
-const user = reactive({
-  id: null,
+// Initialize with UserProfileDTO structure
+const user = reactive<UserProfileDTO>({
+  id: 0,
   username: '',
-  email: ''
+  email: '',
+  userRole: 'MEMBER' as any,
+  avatarUrl: ''
 })
 
 const editForm = reactive({
@@ -133,34 +142,25 @@ const editForm = reactive({
 
 /**
  * 1. Fetch Profile
- * English Comment: Uses $fetch with explicit headers to ensure proxy compatibility
+ * English Comment: Uses the centralized useApi composable for consistency and security.
  */
 const fetchProfile = async () => {
   try {
-    const token = useCookie('auth-token').value
-    console.log('>>> [DEBUG] Profile Request: GET /api/users/me')
+    // Note: URL matches backend @GetMapping("/profile")
+    const { data, error } = await useApi<UserProfileDTO>('/api/users/profile')
 
-    const response = await $fetch('/api/users/me', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json'
-      },
-      onResponseError({ response }) {
-        console.error('>>> [DEBUG] Server Failed (500/404):', response._data)
-      }
-    })
+    if (error.value) {
+      console.error('>>> [DEBUG] Fetch Profile Error:', error.value)
+      return
+    }
 
-    console.log('>>> [DEBUG] Profile Data Received:', response)
-
-    if (response) {
-      user.id = response.id
-      user.username = response.username
-      user.email = response.email
-      // Sync form initially
-      editForm.email = response.email
+    if (data.value) {
+      Object.assign(user, data.value)
+      editForm.email = data.value.email
+      console.log('>>> [DEBUG] Profile Data Synced:', user)
     }
   } catch (err) {
-    console.error('>>> [DEBUG] Fetch Profile Exception:', err)
+    console.error('>>> [DEBUG] Unexpected Exception:', err)
   }
 }
 
@@ -172,32 +172,27 @@ const startEditing = () => {
 
 /**
  * 2. Update Profile
- * English Comment: PUT request to update current user information
+ * English Comment: Submit updated email/password using type-safe useApi.
  */
 const handleUpdate = async () => {
   loading.value = true
   try {
-    const token = useCookie('auth-token').value
-
-    await $fetch('/api/users/me', {
+    const { error } = await useApi('/api/users/profile', {
       method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
       body: {
         email: editForm.email,
-        // Only send password if the user typed something
         password: editForm.password.trim() || null
       }
     })
+
+    if (error.value) throw error.value
 
     console.log('>>> [DEBUG] Update successful')
     await fetchProfile()
     isEditing.value = false
     alert('Changes saved successfully.')
-  } catch (err) {
-    console.error('>>> [DEBUG] Update failed:', err.data || err)
+  } catch (err: any) {
+    console.error('>>> [DEBUG] Update failed:', err)
     alert('Update failed: ' + (err.data?.message || 'Server Error'))
   } finally {
     loading.value = false
