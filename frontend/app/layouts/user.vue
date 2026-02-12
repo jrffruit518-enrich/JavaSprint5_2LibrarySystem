@@ -20,6 +20,7 @@
         >
           Dashboard
         </UButton>
+
         <UButton
           to="/user/books"
           variant="ghost"
@@ -29,6 +30,17 @@
         >
           Book Catalog
         </UButton>
+
+        <UButton
+          to="/user/loans"
+          variant="ghost"
+          icon="i-lucide-library"
+          block
+          truncate
+        >
+          My Loans
+        </UButton>
+
         <UButton
           to="/user/profile"
           variant="ghost"
@@ -38,6 +50,7 @@
         >
           My Profile
         </UButton>
+
         <div class="pt-4 mt-4 border-t border-default">
           <UButton
             to="/"
@@ -64,6 +77,6 @@
 <script setup>
 /**
  * User Layout
- * Clean English version with sidebar navigation
+ * Updated: Added My Loans navigation item.
  */
 </script>

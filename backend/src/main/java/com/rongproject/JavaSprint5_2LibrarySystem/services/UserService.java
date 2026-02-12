@@ -1,14 +1,18 @@
 package com.rongproject.JavaSprint5_2LibrarySystem.services;
 
+import com.rongproject.JavaSprint5_2LibrarySystem.DTO.AdminRegisterRequest;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserProfileDTO;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.entities.User;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.LogStatus;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.UserRole;
+import com.rongproject.JavaSprint5_2LibrarySystem.exceptions.AlreadyExistsException;
 import com.rongproject.JavaSprint5_2LibrarySystem.exceptions.ResourceNotFoundException;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.BorrowLogRepository;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -22,25 +26,32 @@ public class UserService {
     private final BorrowLogRepository borrowLogRepository;
 
     public UserResponse createUser(User user) {
-        // 1. Global uniqueness check
-        if (userRepository.existsByUsername(user.getUsername())) {
-            throw new RuntimeException("Username already exists");
+        // 1. Placeholder email check (Jules: Security guardrail for regular users)
+        // English Comment: Prevent regular users from using the system-reserved placeholder email.
+        if ("pending@library.com".equalsIgnoreCase(user.getEmail())) {
+            throw new AlreadyExistsException("Registration failed: Placeholder email 'pending@library.com' is reserved for system use.");
         }
 
-        // 2. Default role assignment if null
+        // 2. Global uniqueness check for Username
+        if (userRepository.existsByUsername(user.getUsername())) {
+            throw new AlreadyExistsException("Username already exists");
+        }
+
+        // 3. Default role assignment if null
         if (user.getUserRole() == null) {
             user.setUserRole(UserRole.ROLE_USER);
         }
 
-        // 3. Email check (Usually required for all roles for password recovery)
+        // 4. Global uniqueness check for Email
         if (userRepository.existsByEmail(user.getEmail())) {
-            throw new RuntimeException("Email already exists");
+            throw new AlreadyExistsException("Email already exists");
         }
 
+        // 5. Password encoding and Save
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         return mapToResponse(userRepository.save(user));
     }
-    
+
     public UserResponse getUserById(Long id) {
         User user = userRepository.findByIdOrThrow(id);
         return mapToResponse(user);
@@ -60,14 +71,16 @@ public class UserService {
         // English Comment: Prevent changing to an email that is already taken by another user
         if (updatedData.getEmail() != null && !updatedData.getEmail().equals(userToUpdate.getEmail())) {
             if (userRepository.existsByEmail(updatedData.getEmail())) {
-                throw new IllegalStateException("Email is already in use: " + updatedData.getEmail());
+                // Change IllegalStateException to AlreadyExistsException
+                throw new AlreadyExistsException("Email is already in use: " + updatedData.getEmail());
             }
         }
 
-        // English Comment: Prevent changing to a username that is already taken (if your logic allows username change)
+        // English Comment: Prevent changing to a username that is already taken
         if (updatedData.getUsername() != null && !updatedData.getUsername().equals(userToUpdate.getUsername())) {
             if (userRepository.existsByUsername(updatedData.getUsername())) {
-                throw new IllegalStateException("Username is already taken: " + updatedData.getUsername());
+                // Change IllegalStateException to AlreadyExistsException
+                throw new AlreadyExistsException("Username is already taken: " + updatedData.getUsername());
             }
         }
 
@@ -76,7 +89,6 @@ public class UserService {
             userToUpdate.setEnabled(updatedData.isEnabled());
             userToUpdate.setManualLock(!updatedData.isEnabled());
 
-            // English Comment: Admin can also update username/email if necessary
             userToUpdate.setUsername(updatedData.getUsername());
             userToUpdate.setEmail(updatedData.getEmail());
         }
@@ -102,24 +114,28 @@ public class UserService {
     }
 
     public void deleteUser(Long id) {
-        User userToDelete = userRepository.findByIdOrThrow(id);
+        // 1. 获取用户
+        User targetUser = userRepository.findByIdOrThrow(id);
 
-        // 1. Protection logic: Root admin account cannot be deleted
-        // English Comment: Prevent deletion of the system's primary administrator
-        if ("admin".equals(userToDelete.getUsername())) {
-            throw new RuntimeException("The root admin account cannot be deleted!");
+        // 2. 检查是否有未归还图书 (MongoDB)
+        // English Comment: Prevent deletion if user still has books
+        if (borrowLogRepository.existsByUserIdAndStatus(id, LogStatus.BORROWED)) {
+            throw new RuntimeException("Cannot delete user with unreturned books!");
         }
 
-        // 2. Borrowing status check: Query MongoDB to see if user has unreturned books
-        // English Comment: Check if the user has any active borrowing records in MongoDB
-        boolean hasActiveLoans = borrowLogRepository.existsByUserIdAndStatus(id, LogStatus.BORROWED);
-
-        if (hasActiveLoans) {
-            throw new RuntimeException("Cannot delete user: This user still has unreturned books.");
+        // 3. 保护逻辑 1: Root Admin
+        if ("admin".equalsIgnoreCase(targetUser.getUsername())) {
+            throw new RuntimeException("The root administrator account cannot be deleted!");
         }
 
-        // 3. If all checks pass, proceed with deletion in MySQL
-        userRepository.deleteById(id);
+        // 4. 保护逻辑 2: Self-deletion
+        // 注意：这里可能会因为 SecurityContext 没 Mock 报 NPE，所以测试里一定要 Mock
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getName().equals(targetUser.getUsername())) {
+            throw new RuntimeException("You cannot delete your own account while logged in!");
+        }
+
+        userRepository.delete(targetUser);
     }
 
     public UserProfileDTO getProfileByUsername(String username) {
@@ -136,6 +152,33 @@ public class UserService {
                 user.getUserRole(),   // Ensure this field exists in your User entity
                 user.getAvatarUrl()   // Ensure this field exists in your User entity
         );
+    }
+
+
+    public UserResponse createAdmin(AdminRegisterRequest request) {
+        // 1. Validation: Use the newly created AlreadyExistsException
+        if (userRepository.existsByUsername(request.username())) {
+            throw new AlreadyExistsException("Admin username already taken: " + request.username());
+        }
+
+        // 2. Build Admin Entity using the internal email generator
+        User admin = User.builder()
+                .username(request.username())
+                .password(passwordEncoder.encode(request.password()))
+                .email(generateInternalEmail(request.username()))
+                .userRole(UserRole.ROLE_ADMIN)
+                .enabled(true) // Ensure the admin is active by default
+                .manualLock(false)
+                .build();
+
+        // 3. Save and map to response
+        User savedAdmin = userRepository.save(admin);
+        return mapToResponse(savedAdmin);
+    }
+
+    private String generateInternalEmail(String username) {
+        // English Comment: Generates a unique internal identifier to satisfy DB constraints
+        return String.format("%s@internal.system", username.toLowerCase());
     }
 
     private UserResponse mapToResponse(User user) {

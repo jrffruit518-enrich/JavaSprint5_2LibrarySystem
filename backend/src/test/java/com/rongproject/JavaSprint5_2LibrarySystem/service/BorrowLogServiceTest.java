@@ -40,6 +40,30 @@ public class BorrowLogServiceTest {
     private Book mockBook;
     private BorrowLog mockLog;
 
+    /**
+     * Helper method to manually mock book and user repository responses.
+     * Not using @BeforeEach because it requires parameters for specific test cases.
+     */
+    private void mockBookAndUser(Long bookId, String bookTitle, Long userId, String username) {
+        // Correcting to use Builder as defined in entities
+        Book mockBook = Book.builder()
+                .id(bookId)
+                .title(bookTitle)
+                .author("Standard Author")
+                .isbn("ISBN-" + bookId)
+                .build();
+
+        User mockUser = User.builder()
+                .id(userId)
+                .username(username)
+                .email(username + "@test.com")
+                .password("encoded_pass")
+                .build();
+
+        when(bookRepository.findById(bookId)).thenReturn(Optional.of(mockBook));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
+    }
+
     @BeforeEach
     void setUp() {
         // English Comment: Standard setup for user, book and log entities
@@ -164,5 +188,58 @@ public class BorrowLogServiceTest {
         assertTrue(mockUser.isEnabled());
         assertTrue(status.canBorrow());
         verify(userRepository).save(mockUser);
+    }
+
+    @Test
+    void getOngoingLoans_ShouldReturnMappedRecords() {
+        // Arrange
+        Long userId = 1L;
+        BorrowLog mockLog = new BorrowLog("log123", userId, 101L, LocalDateTime.now(), null, LogStatus.BORROWED);
+
+        when(borrowLogRepository.findByUserIdAndStatusIn(eq(userId), anyList()))
+                .thenReturn(List.of(mockLog));
+        mockBookAndUser(101L, "Test Driven Development", userId, "Jules");
+
+        // Act
+        List<LogResponse> results = borrowingService.getOngoingLoans(userId);
+
+        // Assert
+        assertEquals(1, results.size());
+        assertEquals("log123", results.get(0).logId());
+        assertEquals("Test Driven Development", results.get(0).bookTitle());
+        assertEquals(LogStatus.BORROWED, results.get(0).status());
+    }
+    @Test
+    void getLoanHistory_WithSearchKeyword_ShouldFilterCorrectly() {
+        // 1. Arrange: Prepare test data using Builder to match your Entity definition
+        Long userId = 1L;
+        BorrowLog log1 = BorrowLog.builder()
+                .id("id1").userId(userId).bookId(201L)
+                .status(LogStatus.RETURNED).borrowDate(LocalDateTime.now().minusDays(5))
+                .returnDate(LocalDateTime.now()).build();
+        BorrowLog log2 = BorrowLog.builder()
+                .id("id2").userId(userId).bookId(202L)
+                .status(LogStatus.RETURNED).borrowDate(LocalDateTime.now().minusDays(10))
+                .returnDate(LocalDateTime.now()).build();
+
+        when(borrowLogRepository.findByUserIdAndStatus(userId, LogStatus.RETURNED))
+                .thenReturn(List.of(log1, log2));
+
+        // 2. Mock Book entities with Builder
+        Book book1 = Book.builder().id(201L).title("Spring Boot in Action").author("Author A").isbn("ISBN1").build();
+        Book book2 = Book.builder().id(202L).title("Learning Python").author("Author B").isbn("ISBN2").build();
+        User user = User.builder().id(userId).username("Jules").email("jules@test.com").build();
+
+        when(bookRepository.findById(201L)).thenReturn(Optional.of(book1));
+        when(bookRepository.findById(202L)).thenReturn(Optional.of(book2));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        // 3. Act & Assert
+        List<LogResponse> springResults = borrowingService.getLoanHistory(userId, "Spring");
+        assertEquals(1, springResults.size(), "Should find 1 book with 'Spring'");
+        assertEquals("Spring Boot in Action", springResults.get(0).bookTitle());
+
+        List<LogResponse> emptyResults = borrowingService.getLoanHistory(userId, "NonExistent");
+        assertTrue(emptyResults.isEmpty(), "Should return empty list for no match");
     }
 }

@@ -5,6 +5,7 @@ import com.rongproject.JavaSprint5_2LibrarySystem.DTO.BookResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.entities.Book;
 import com.rongproject.JavaSprint5_2LibrarySystem.entities.BorrowLog;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.LogStatus;
+import com.rongproject.JavaSprint5_2LibrarySystem.exceptions.AlreadyExistsException;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.BookRepository;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.BorrowLogRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,9 +23,11 @@ public class BookService {
 
     public BookResponse createBook(BookCreationRequest request) {
         // Validation: Prevent duplicate ISBN
+        // Change IllegalStateException to AlreadyExistsException to align with project standards
         if (bookRepository.existsByIsbn(request.isbn())) {
-            throw new IllegalStateException("A book with ISBN " + request.isbn() + " already exists.");
+            throw new AlreadyExistsException("A book with ISBN " + request.isbn() + " already exists.");
         }
+
         Book book = Book.builder()
                 .title(request.title())
                 .author(request.author())
@@ -41,12 +44,14 @@ public class BookService {
         return mapToResponse(savedBook);
     }
     
+
     public BookResponse updateBook(Long id, BookCreationRequest request) {
         Book book = bookRepository.getBookById(id);
 
         // Validation: Prevent duplicate ISBN
+        // Change IllegalStateException to AlreadyExistsException
         if (!book.getIsbn().equals(request.isbn()) && bookRepository.existsByIsbn(request.isbn())) {
-            throw new IllegalStateException("ISBN " + request.isbn() + " is already taken by another book.");
+            throw new AlreadyExistsException("ISBN " + request.isbn() + " is already taken by another book.");
         }
 
         book.setTitle(request.title());

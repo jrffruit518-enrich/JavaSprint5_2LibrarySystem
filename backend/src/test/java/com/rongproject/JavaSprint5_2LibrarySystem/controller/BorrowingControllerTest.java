@@ -19,6 +19,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
@@ -47,6 +48,15 @@ public class BorrowingControllerTest {
 
     private CustomUserDetails mockUserDetails;
     private LogResponse mockLogResponse;
+
+    // Standard test data: LogResponse record
+    private LogResponse createMockResponse(String id, String title, LogStatus status) {
+        return new LogResponse(
+                id, "Jules", title,
+                LocalDateTime.now(), null, status,
+                "Status: " + status
+        );
+    }
 
     @BeforeEach
     void setUp() {
@@ -137,5 +147,42 @@ public class BorrowingControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.borrowCount").value(2))
                 .andExpect(jsonPath("$.canBorrow").value(true));
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("GET /api/borrowings/user/{userId}/ongoing - Success")
+    void getOngoingLoans_ShouldReturnList() throws Exception {
+        // Arrange
+        Long userId = 1L;
+        List<LogResponse> responses = List.of(
+                createMockResponse("log1", "Effective Java", LogStatus.BORROWED)
+        );
+        when(borrowingService.getOngoingLoans(userId)).thenReturn(responses);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/borrowings/user/{userId}/ongoing", userId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.size()").value(1))
+                .andExpect(jsonPath("$[0].bookTitle").value("Effective Java"))
+                .andExpect(jsonPath("$[0].status").value("BORROWED"));
+    }
+
+    @WithMockUser
+    @Test
+    void getLoanHistory_WithKeyword_ShouldReturnFilteredList() throws Exception {
+        // Arrange
+        Long userId = 1L;
+        String keyword = "Java";
+        List<LogResponse> responses = List.of(
+                createMockResponse("log2", "Java Programming", LogStatus.RETURNED)
+        );
+        when(borrowingService.getLoanHistory(userId, keyword)).thenReturn(responses);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/borrowings/user/{userId}/history",userId)
+                        .param("keyword", keyword))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].bookTitle").value("Java Programming"));
     }
 }

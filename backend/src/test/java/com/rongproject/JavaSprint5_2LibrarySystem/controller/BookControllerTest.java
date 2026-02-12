@@ -5,6 +5,7 @@ import com.rongproject.JavaSprint5_2LibrarySystem.DTO.BookCreationRequest;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.BookResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.controllers.BookController;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.BookGenre;
+import com.rongproject.JavaSprint5_2LibrarySystem.exceptions.AlreadyExistsException;
 import com.rongproject.JavaSprint5_2LibrarySystem.security.JwtUtils;
 import com.rongproject.JavaSprint5_2LibrarySystem.services.BookService;
 import com.rongproject.JavaSprint5_2LibrarySystem.services.CustomUserDetailsService;
@@ -164,5 +165,35 @@ public class BookControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("POST /api/books - Failure: ISBN already exists")
+    void createBook_Conflict() throws Exception {
+        // 1. Mock Service 抛出自定义异常
+        when(bookService.createBook(any(BookCreationRequest.class)))
+                .thenThrow(new AlreadyExistsException("Book with this ISBN already exists"));
+
+        // 2. 验证是否返回 409 Conflict
+        mockMvc.perform(post("/api/books")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest)))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("PUT /api/books/{id} - Failure: ISBN taken by another book")
+    void updateBook_Conflict() throws Exception {
+        when(bookService.updateBook(eq(1L), any(BookCreationRequest.class)))
+                .thenThrow(new AlreadyExistsException("ISBN already taken"));
+
+        mockMvc.perform(put("/api/books/1")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest)))
+                .andExpect(status().isConflict());
     }
 }

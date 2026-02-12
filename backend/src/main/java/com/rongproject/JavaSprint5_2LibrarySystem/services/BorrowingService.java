@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -120,6 +121,32 @@ public class BorrowingService {
         );
     }
 
+    // In BorrowingService.java
+
+    /**
+     * Get all ongoing loans (BORROWED or OVERDUE) for a specific user
+     */
+    public List<LogResponse> getOngoingLoans(Long userId) {
+        List<LogStatus> activeStatuses = List.of(LogStatus.BORROWED, LogStatus.OVERDUE);
+        return borrowLogRepository.findByUserIdAndStatusIn(userId, activeStatuses)
+                .stream()
+                .map(this::convertToLogResponse)
+                .toList();
+    }
+
+    /**
+     * Get returned books history with optional keyword search
+     */
+    public List<LogResponse> getLoanHistory(Long userId, String searchKeyword) {
+        List<BorrowLog> history = borrowLogRepository.findByUserIdAndStatus(userId, LogStatus.RETURNED);
+
+        return history.stream()
+                .map(this::convertToLogResponse) // Result is now LogResponse Record
+                .filter(log -> searchKeyword == null || searchKeyword.isBlank() ||
+                        log.bookTitle().toLowerCase().contains(searchKeyword.toLowerCase())) // Use bookTitle()
+                .toList();
+    }
+
     public UserStatusResponse getUserBorrowingStatus(Long userId) {
         User user = userRepository.findByIdOrThrow(userId);
 
@@ -201,5 +228,38 @@ public class BorrowingService {
             user.setManualLock(false);
             userRepository.save(user);
         }
+    }
+
+    /**
+     * Converts a BorrowLog entity to a LogResponse Record.
+     * Matches the 7-field structure: logId, username, bookTitle, borrowDate, returnDate, status, message.
+     */
+    private LogResponse convertToLogResponse(BorrowLog log) {
+        // 1. Fetch book title
+        String bookTitle = bookRepository.findById(log.getBookId())
+                .map(Book::getTitle)
+                .orElse("Unknown Book");
+
+        // 2. Fetch username
+        String username = userRepository.findById(log.getUserId())
+                .map(User::getUsername)
+                .orElse("Unknown User");
+
+        // 3. Create personalized message
+        String message = String.format("%s, 你目前的借阅状态是: %s", username, log.getStatus());
+        if (log.getStatus() == LogStatus.RETURNED) {
+            message = String.format("%s, 你已于 %s 归还了《%s》。", username, log.getReturnDate(), bookTitle);
+        }
+
+        // 4. Canonical Constructor (Matches your 7 fields exactly)
+        return new LogResponse(
+                log.getId(),        // logId
+                username,           // username
+                bookTitle,          // bookTitle
+                log.getBorrowDate(),// borrowDate
+                log.getReturnDate(),// returnDate
+                log.getStatus(),    // status
+                message             // message
+        );
     }
 }

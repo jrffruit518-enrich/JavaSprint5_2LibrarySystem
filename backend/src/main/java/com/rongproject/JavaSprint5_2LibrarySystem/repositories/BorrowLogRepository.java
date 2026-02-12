@@ -31,4 +31,15 @@ public interface BorrowLogRepository extends MongoRepository<BorrowLog,String> {
 
     // English Comment: Check if a specific book is currently out on loan
     boolean existsByBookIdAndStatus(Long bookId, LogStatus status);
+    /**
+     * Finds logs for a user that match any of the provided statuses.
+     * Used for getting ongoing loans (BORROWED, OVERDUE).
+     */
+    List<BorrowLog> findByUserIdAndStatusIn(Long userId, List<LogStatus> statuses);
+
+    /**
+     * Finds logs for a user with a specific status.
+     * Used for getting loan history (RETURNED).
+     */
+    List<BorrowLog> findByUserIdAndStatus(Long userId, LogStatus status);
 }

@@ -17,6 +17,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/borrowings")
 @RequiredArgsConstructor
@@ -66,6 +68,18 @@ public class BorrowingController {
             @Parameter(description = "The ID of the user to check", example = "5")
             @PathVariable Long userId) {
         return ResponseEntity.ok(borrowingService.getUserBorrowingStatus(userId));
+    }
+
+    @GetMapping("/user/{userId}/ongoing")
+    public ResponseEntity<List<LogResponse>> getOngoingLoans(@PathVariable Long userId) {
+        return ResponseEntity.ok(borrowingService.getOngoingLoans(userId));
+    }
+
+    @GetMapping("/user/{userId}/history")
+    public ResponseEntity<List<LogResponse>> getLoanHistory(
+            @PathVariable Long userId,
+            @RequestParam(required = false) String keyword) {
+        return ResponseEntity.ok(borrowingService.getLoanHistory(userId, keyword));
     }
 
 

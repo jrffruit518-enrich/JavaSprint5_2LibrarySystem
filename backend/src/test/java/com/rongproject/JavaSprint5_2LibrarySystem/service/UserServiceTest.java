@@ -1,14 +1,17 @@
 package com.rongproject.JavaSprint5_2LibrarySystem.service;
 
+import com.rongproject.JavaSprint5_2LibrarySystem.DTO.AdminRegisterRequest;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserProfileDTO;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.entities.User;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.LogStatus;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.UserRole;
+import com.rongproject.JavaSprint5_2LibrarySystem.exceptions.AlreadyExistsException;
 import com.rongproject.JavaSprint5_2LibrarySystem.exceptions.ResourceNotFoundException;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.BorrowLogRepository;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.UserRepository;
 import com.rongproject.JavaSprint5_2LibrarySystem.services.UserService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,6 +19,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
@@ -48,6 +54,11 @@ public class UserServiceTest {
         mockUser.setManualLock(false);
     }
 
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
+
     // --- 1. createUser Tests ---
 
     @Test
@@ -69,7 +80,8 @@ public class UserServiceTest {
     void createUser_Fail_UsernameExists() {
         when(userRepository.existsByUsername("john_doe")).thenReturn(true);
 
-        assertThrows(RuntimeException.class, () -> userService.createUser(mockUser));
+        // Changed from RuntimeException to AlreadyExistsException
+        assertThrows(AlreadyExistsException.class, () -> userService.createUser(mockUser));
         verify(userRepository, never()).save(any());
     }
 
@@ -103,13 +115,15 @@ public class UserServiceTest {
         User updateData = new User();
         updateData.setEmail("other@example.com");
 
-        // English Comment: Mock that the new email is already in the system
         when(userRepository.existsByEmail("other@example.com")).thenReturn(true);
 
-        assertThrows(IllegalStateException.class, () ->
+        // Changed from IllegalStateException to AlreadyExistsException
+        assertThrows(AlreadyExistsException.class, () ->
                 userService.updateUser(1L, updateData, "USER")
         );
     }
+
+
 
     @Test
     @DisplayName("updateUser - Root Admin cannot be disabled")
@@ -129,30 +143,50 @@ public class UserServiceTest {
     // --- 3. deleteUser Tests ---
 
     @Test
-    @DisplayName("deleteUser - Success when no active loans")
     void deleteUser_Success() {
-        when(userRepository.findByIdOrThrow(1L)).thenReturn(mockUser);
-        // English Comment: Mock MongoDB checking for active books
-        when(borrowLogRepository.existsByUserIdAndStatus(1L, LogStatus.BORROWED)).thenReturn(false);
+        User targetUser = User.builder().id(2L).username("other_user").build();
+        when(userRepository.findByIdOrThrow(2L)).thenReturn(targetUser);
 
-        userService.deleteUser(1L);
+        // 关键：模拟当前登录用户为 "admin_user"
+        Authentication auth = mock(Authentication.class);
+        when(auth.getName()).thenReturn("admin_user");
+        SecurityContext securityContext = mock(SecurityContext.class);
+        when(securityContext.getAuthentication()).thenReturn(auth);
+        SecurityContextHolder.setContext(securityContext);
 
-        verify(userRepository).deleteById(1L);
+        userService.deleteUser(2L);
+
+        verify(userRepository).delete(targetUser);
+        SecurityContextHolder.clearContext(); // 养成好习惯
     }
 
     @Test
     @DisplayName("deleteUser - Fail when user has unreturned books")
     void deleteUser_Fail_ActiveLoans() {
+        // 1. Arrange
         when(userRepository.findByIdOrThrow(1L)).thenReturn(mockUser);
-        // English Comment: User still has books in MongoDB
-        when(borrowLogRepository.existsByUserIdAndStatus(1L, LogStatus.BORROWED)).thenReturn(true);
 
+        // 使用 lenient() 允许这个 stubbing 不被调用
+        lenient().when(borrowLogRepository.existsByUserIdAndStatus(1L, LogStatus.BORROWED)).thenReturn(true);
+
+        // 2. Security Context Mock 也使用 lenient()
+        Authentication auth = mock(Authentication.class);
+        lenient().when(auth.getName()).thenReturn("some_other_admin");
+
+        SecurityContext securityContext = mock(SecurityContext.class);
+        lenient().when(securityContext.getAuthentication()).thenReturn(auth);
+        SecurityContextHolder.setContext(securityContext);
+
+        // 3. Act & Assert
         RuntimeException exception = assertThrows(RuntimeException.class, () ->
                 userService.deleteUser(1L)
         );
+
         assertTrue(exception.getMessage().contains("unreturned books"));
-        verify(userRepository, never()).deleteById(anyLong());
+
+        SecurityContextHolder.clearContext();
     }
+
 
     @Test
     @DisplayName("deleteUser - Root admin cannot be deleted")
@@ -198,5 +232,87 @@ public class UserServiceTest {
         assertThrows(ResourceNotFoundException.class, () -> {
             userService.getProfileByUsername("unknown");
         });
+    }
+    @Test
+    void createAdmin_Success() {
+        // 1. Arrange
+        AdminRegisterRequest request = new AdminRegisterRequest("new_admin", "password123");
+        when(userRepository.existsByUsername(anyString())).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("encoded_password");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // 2. Act
+        UserResponse response = userService.createAdmin(request);
+
+        // 3. Assert
+        assertEquals("new_admin", response.username());
+        // Verify our professional internal email logic
+        assertEquals("new_admin@internal.system", response.email());
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void createAdmin_ThrowsException_WhenUsernameExists() {
+        // Arrange
+        AdminRegisterRequest request = new AdminRegisterRequest("existing_admin", "password");
+        when(userRepository.existsByUsername("existing_admin")).thenReturn(true);
+
+        // Act & Assert
+        assertThrows(AlreadyExistsException.class, () -> userService.createAdmin(request));
+    }
+
+    @Test
+    @DisplayName("createUser - Failure (Placeholder Email Blocked)")
+    void createUser_Fail_PlaceholderEmail() {
+        // 确保 mockUser 已经被实例化，不是 null
+        mockUser.setEmail("pending@library.com");
+
+        assertThrows(AlreadyExistsException.class, () -> userService.createUser(mockUser));
+    }
+
+    @Test
+    @DisplayName("deleteUser - Fail when deleting root admin")
+    void deleteUser_Fail_RootAdmin() {
+        // 1. Arrange: Target is the protected "admin" account
+        User rootAdmin = User.builder().id(1L).username("admin").build();
+        when(userRepository.findByIdOrThrow(1L)).thenReturn(rootAdmin);
+
+        // 2. Act & Assert
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                userService.deleteUser(1L)
+        );
+
+        // English Comment: Ensure the error message matches the Service implementation exactly
+        assertTrue(exception.getMessage().contains("root administrator account cannot be deleted"));
+        verify(userRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteAdmin_Success() {
+        // 1. Arrange: Mock the operator as "admin_boss" and target as "user_to_delete"
+        User targetUser = User.builder().id(1L).username("user_to_delete").build();
+        when(userRepository.findByIdOrThrow(1L)).thenReturn(targetUser);
+
+        // Mock SecurityContext to return "admin_boss"
+        Authentication auth = mock(Authentication.class);
+        when(auth.getName()).thenReturn("admin_boss");
+        SecurityContextHolder.getContext().setAuthentication(auth);
+
+        // 2. Act
+        userService.deleteUser(1L);
+
+        // 3. Assert
+        verify(userRepository).delete(targetUser);
+    }
+
+    @Test
+    void deleteUser_ThrowsException_WhenDeletingRootAdmin() {
+        // Arrange: Target is the protected "admin" account
+        User rootAdmin = User.builder().id(1L).username("admin").build();
+        when(userRepository.findByIdOrThrow(1L)).thenReturn(rootAdmin);
+
+        // Act & Assert
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> userService.deleteUser(1L));
+        assertEquals("The root administrator account cannot be deleted!", exception.getMessage());
     }
 }

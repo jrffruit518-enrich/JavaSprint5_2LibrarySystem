@@ -5,6 +5,7 @@ import com.rongproject.JavaSprint5_2LibrarySystem.DTO.BookResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.entities.Book;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.BookGenre;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.LogStatus;
+import com.rongproject.JavaSprint5_2LibrarySystem.exceptions.AlreadyExistsException;
 import com.rongproject.JavaSprint5_2LibrarySystem.exceptions.ResourceNotFoundException;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.BookRepository;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.BorrowLogRepository;
@@ -78,7 +79,7 @@ public class BookServiceTest {
     void createBook_ThrowsException_WhenIsbnExists() {
         when(bookRepository.existsByIsbn(anyString())).thenReturn(true);
 
-        assertThrows(IllegalStateException.class, () -> bookService.createBook(mockRequest));
+        assertThrows(AlreadyExistsException.class, () -> bookService.createBook(mockRequest));
         verify(bookRepository, never()).save(any(Book.class));
     }
 
@@ -131,7 +132,7 @@ public class BookServiceTest {
         when(bookRepository.getBookById(1L)).thenReturn(mockBook);
         when(bookRepository.existsByIsbn("9999999999")).thenReturn(true);
 
-        assertThrows(IllegalStateException.class, () -> bookService.updateBook(1L, newRequest));
+        assertThrows(AlreadyExistsException.class, () -> bookService.updateBook(1L, newRequest));
     }
 
     // --- Delete Book Tests ---

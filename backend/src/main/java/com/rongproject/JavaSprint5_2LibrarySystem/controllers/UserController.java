@@ -58,6 +58,16 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/admin")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Admin: Create a new sub-administrator",
+            description = "Creates a new user with ROLE_ADMIN. Only name and password required.")
+    public ResponseEntity<UserResponse> createAdmin(@Valid @RequestBody AdminRegisterRequest request) {
+        // Self-check: Calling the specialized service method we just created
+        UserResponse response = userService.createAdmin(request);
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+
     // --- 2. 状态切换 (Admin Only) ---
 
     @PatchMapping("/{id}/status")
