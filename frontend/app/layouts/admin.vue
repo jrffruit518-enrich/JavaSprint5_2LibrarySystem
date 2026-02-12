@@ -1,9 +1,3 @@
-明白你的意思了。既然 Admin 本身就是 User 的一种角色，确实不需要单独的 “Admin Management”。
-
-这是优化后的侧边栏布局，删除了重复的入口，并保持了整体逻辑的简洁。
-
-📄 layouts/admin.vue
-代码段
 <template>
   <div class="min-h-screen flex flex-col">
     <header class="h-16 border-b border-default flex items-center justify-between px-6 bg-background sticky top-0 z-10">
@@ -14,7 +8,6 @@
         />
         <span class="font-bold text-lg text-highlighted">Library Admin System</span>
       </div>
-
       <div class="flex items-center gap-4">
         <UAvatar
           src="https://avatars.githubusercontent.com/u/1?v=4"
@@ -35,9 +28,7 @@
             class="justify-start"
             active-class="bg-primary/10 text-primary font-semibold"
           />
-
           <USeparator class="my-2" />
-
           <UButton
             to="/admin/books"
             icon="i-lucide-book-copy"
@@ -47,7 +38,6 @@
             class="justify-start"
             active-class="bg-primary/10 text-primary font-semibold"
           />
-
           <UButton
             to="/admin/users"
             icon="i-lucide-users"
@@ -58,7 +48,6 @@
             active-class="bg-primary/10 text-primary font-semibold"
           />
         </nav>
-
         <div class="p-4 border-t border-default">
           <UButton
             label="Logout"
@@ -73,7 +62,17 @@
       </aside>
 
       <main class="flex-1 p-6">
-        <slot />
+        <slot v-if="isVerified" />
+        <div
+          v-else
+          class="flex flex-col items-center justify-center h-full"
+        >
+          <UIcon
+            name="i-heroicons-arrow-path"
+            class="animate-spin text-4xl mb-2"
+          />
+          <p>Authenticating...</p>
+        </div>
       </main>
     </div>
   </div>
@@ -81,20 +80,32 @@
 
 <script setup lang="ts">
 /**
- * 图书馆项目 (Library Project) - Admin Layout
- * Simplified navigation to focus on core management modules.
+ * 图书馆项目 - Admin Layout
+ * Core Fix: Standardized to 'user_role' and 'auth_token'.
  */
 
+const isVerified = ref(false)
+
 const handleLogout = () => {
-  // English Comment: Clear all auth-related cookies to ensure clean state
-  const roleCookie = useCookie('user-role')
-  const tokenCookie = useCookie('auth-token')
-
-  roleCookie.value = null
-  tokenCookie.value = null
-
-  console.log('User logged out, cookies cleared.')
-  // English Comment: Redirect to login page after logout
+  // English Comment: Clear the correct standardized cookies
+  useCookie('user_role').value = null
+  useCookie('auth_token').value = null
   navigateTo('/')
 }
+
+onMounted(() => {
+  // English Comment: Critical - Changed 'user-role' to 'user_role'
+  const role = useCookie('user_role').value
+
+  console.log('--- Jules Debug: Admin Layout Verification ---')
+  console.log('Role found in cookie:', role)
+
+  if (role === 'ADMIN' || role === 'ROLE_ADMIN') {
+    isVerified.value = true
+  } else {
+    console.error('Unauthorized access to admin layout. Role:', role)
+    // Clear potentially corrupt data and redirect
+    handleLogout()
+  }
+})
 </script>

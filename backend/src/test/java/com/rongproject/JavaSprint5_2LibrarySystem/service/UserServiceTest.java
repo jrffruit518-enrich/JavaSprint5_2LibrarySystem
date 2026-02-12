@@ -24,7 +24,9 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -315,4 +317,6 @@ public class UserServiceTest {
         RuntimeException exception = assertThrows(RuntimeException.class, () -> userService.deleteUser(1L));
         assertEquals("The root administrator account cannot be deleted!", exception.getMessage());
     }
+
+
 }

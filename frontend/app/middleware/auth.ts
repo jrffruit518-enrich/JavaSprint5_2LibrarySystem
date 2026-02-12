@@ -1,11 +1,17 @@
+// middleware/auth.ts
 export default defineNuxtRouteMiddleware((to, _from) => {
-  // English Comment: Using a basic check for now. Replace with your actual auth logic later.
-  // _from starts with underscore to tell TS it's intentionally unused.
+  const token = useCookie('auth_token').value
+  const role = useCookie('user_role').value // 核心：确保这里也是下划线
 
-  const isAuthenticated = false // TODO: Replace with your actual auth state (e.g., a cookie check)
+  const isAuthenticated = !!token
 
-  if (!isAuthenticated && to.path.startsWith('/admin')) {
-    // English Comment: Prevent infinite redirect if already on login
+  // 如果未登录，踢回首页
+  if (!isAuthenticated && (to.path.startsWith('/admin') || to.path.startsWith('/user'))) {
     return navigateTo('/')
+  }
+
+  // 如果想去管理员页面，但角色不是 ADMIN，踢回用户页
+  if (to.path.startsWith('/admin') && role !== 'ADMIN') {
+    return navigateTo('/user')
   }
 })

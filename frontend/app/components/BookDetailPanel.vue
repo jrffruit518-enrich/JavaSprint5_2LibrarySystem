@@ -1,9 +1,3 @@
-明白，完全记住了！UCard 的 ui 属性必须严格使用 :ui="{ body: 'p-6' }" 这种格式，否则 TypeScript 会因为类型不匹配而标红报错。
-
-这是最新的、针对 Admin 新增功能完全优化的 components/BookDetailPanel.vue 完整代码。我已经把 UCard 的写法固定为你要求的格式。
-
-📄 完整代码：components/BookDetailPanel.vue
-代码段
 <template>
   <UCard
     class="mb-8 border-2 border-primary/20 shadow-lg"
@@ -74,7 +68,7 @@
           </div>
         </div>
 
-        <UField
+        <UFormField
           v-if="mode !== 'view' && role === 'admin'"
           label="Image Path"
           class="mt-4"
@@ -84,7 +78,7 @@
             size="sm"
             placeholder="/covers/example.jpg"
           />
-        </UField>
+        </UFormField>
       </div>
 
       <div class="flex-1 space-y-4 text-sm">
@@ -146,7 +140,7 @@
             <USelect
               v-else
               v-model="localBook.bookGenre"
-              :items="['FICTION', 'NON_FICTION', 'SCIENCE', 'HISTORY', 'ART', 'FANTASY']"
+              :options="['FICTION', 'NON_FICTION', 'SCIENCE', 'HISTORY', 'ART', 'FANTASY']"
             />
           </div>
 
@@ -228,8 +222,8 @@
 
 <script setup lang="ts">
 /**
- * 图书馆项目 (Library Project) - Book Detail Panel
- * Support: Admin (Add/Edit), User (Borrow), Guest (View)
+ * 图书馆项目 - Book Detail Panel
+ * Jules Fix: Refactored for Nuxt 4 and Nuxt UI v3 standards.
  */
 import type { Book } from '~/types/book'
 
@@ -257,7 +251,7 @@ const coverUrl = computed(() => {
   return `${apiBase}${path}`
 })
 
-// English Comment: Sync internal state with new props
+// English Comment: Standard deep watcher for props sync
 watch(() => props.book, (newVal) => {
   localBook.value = { ...newVal }
   isImageLoaded.value = false

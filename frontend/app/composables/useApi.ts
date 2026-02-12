@@ -3,6 +3,7 @@ import type { UseFetchOptions } from 'nuxt/app'
 /**
  * app/composables/useApi.ts
  * A type-safe fetch wrapper for the Library Project.
+ * Updated: Standardized cookie key to 'auth_token'
  */
 
 /* Define the structure of the backend error response */
@@ -16,15 +17,18 @@ export interface UserProfileDTO {
   id: number
   username: string
   email: string
-  userRole: 'MEMBER' | 'ADMIN' // Adjust based on your UserRole enum
+  userRole: 'MEMBER' | 'ADMIN'
   avatarUrl: string
 }
 
 export const useApi = <T>(url: string, options: UseFetchOptions<T> = {}) => {
-  const token = useCookie<string | null>('auth-token')
+  /**
+   * 1. Core Fix: Changed 'auth-token' to 'auth_token' to match index.vue
+   */
+  const token = useCookie<string | null>('auth_token')
 
   /**
-   * 1. Get runtime configuration.
+   * 2. Get runtime configuration.
    */
   const config = useRuntimeConfig()
 
@@ -39,11 +43,11 @@ export const useApi = <T>(url: string, options: UseFetchOptions<T> = {}) => {
 
   return useFetch(url, {
     /**
-     * 2. Use dynamic baseURL from runtimeConfig.
+     * 3. Use dynamic baseURL from runtimeConfig.
      */
     baseURL: config.public.apiBase,
 
-    /* Manually mapping necessary options */
+    /* Manually mapping necessary options - ALL ORIGINAL OPTIONS PRESERVED */
     method: options.method,
     body: options.body,
     params: options.params,
@@ -62,6 +66,11 @@ export const useApi = <T>(url: string, options: UseFetchOptions<T> = {}) => {
 
       if (status === 401 || status === 403) {
         console.error(`[Auth Error ${status}]:`, errorMsg)
+
+        // English Comment: Standardize redirect to login on auth failure
+        if (import.meta.client) {
+          navigateTo('/')
+        }
       } else {
         console.error(`[API Error ${status}]:`, errorMsg)
       }
@@ -70,8 +79,7 @@ export const useApi = <T>(url: string, options: UseFetchOptions<T> = {}) => {
 }
 
 /**
- * 3. Helper function to fetch the current user's profile.
- * This can be used directly in profile.vue.
+ * 4. Helper function to fetch the current user's profile.
  */
 export const useUserProfile = () => {
   return useApi<UserProfileDTO>('/api/users/profile', {

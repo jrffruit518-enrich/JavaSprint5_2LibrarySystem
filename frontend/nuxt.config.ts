@@ -20,7 +20,9 @@ export default defineNuxtConfig({
   },
 
   routeRules: {
-    '/': { prerender: true }
+    '/': { prerender: true },
+    // English Comment: Disable SSR for admin routes to fix instant redirect issues caused by cookie sync
+    '/admin/**': { ssr: false }
   },
 
   compatibilityDate: '2025-01-15',
