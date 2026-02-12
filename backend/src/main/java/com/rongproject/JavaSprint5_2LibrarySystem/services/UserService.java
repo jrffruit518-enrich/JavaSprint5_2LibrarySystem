@@ -7,10 +7,13 @@ import com.rongproject.JavaSprint5_2LibrarySystem.entities.User;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.LogStatus;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.UserRole;
 import com.rongproject.JavaSprint5_2LibrarySystem.exceptions.AlreadyExistsException;
+import com.rongproject.JavaSprint5_2LibrarySystem.exceptions.ForbiddenException;
 import com.rongproject.JavaSprint5_2LibrarySystem.exceptions.ResourceNotFoundException;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.BorrowLogRepository;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.UserRepository;
+import com.rongproject.JavaSprint5_2LibrarySystem.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.apache.catalina.security.SecurityUtil;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -58,59 +61,92 @@ public class UserService {
     }
 
     public UserResponse updateUser(Long targetUserId, User updatedData, String operatorRole) {
+        // 1. 获取现有用户信息
+        System.out.println("DEBUG: Current User is " + SecurityUtils.getCurrentUsername());
         User userToUpdate = userRepository.findByIdOrThrow(targetUserId);
+        String currentUsername = SecurityUtils.getCurrentUsername(); // 假设你的工具类
 
-        // 1. Root Admin Protection
+        // 2. Root Admin 核心保护
         if ("admin".equals(userToUpdate.getUsername())) {
-            if (updatedData.isEnabled() == false) {
-                throw new RuntimeException("The root admin account cannot be disabled!");
+            // 只有 admin 自己能改自己
+            if (!"admin".equals(currentUsername)) {
+                throw new ForbiddenException("Root admin can only be modified by itself");
+            }
+            // 即使是 admin 自己，也不允许把自己的名字改掉
+            if (updatedData.getUsername() != null && !"admin".equals(updatedData.getUsername())) {
+                throw new ForbiddenException("Root admin username is permanent");
             }
         }
 
-        // 2. Email & Username Uniqueness Check
-        // English Comment: Prevent changing to an email that is already taken by another user
+        // 3. 禁止非法占位
+        if (updatedData.getUsername() != null && "admin".equals(updatedData.getUsername())
+                && !"admin".equals(userToUpdate.getUsername())) {
+            throw new ForbiddenException("Username 'admin' is reserved");
+        }
+
+        // 4. 唯一性检查 (仅在字段发生变化且不为空时检查)
         if (updatedData.getEmail() != null && !updatedData.getEmail().equals(userToUpdate.getEmail())) {
             if (userRepository.existsByEmail(updatedData.getEmail())) {
-                // Change IllegalStateException to AlreadyExistsException
                 throw new AlreadyExistsException("Email is already in use: " + updatedData.getEmail());
             }
         }
-
-        // English Comment: Prevent changing to a username that is already taken
         if (updatedData.getUsername() != null && !updatedData.getUsername().equals(userToUpdate.getUsername())) {
             if (userRepository.existsByUsername(updatedData.getUsername())) {
-                // Change IllegalStateException to AlreadyExistsException
                 throw new AlreadyExistsException("Username is already taken: " + updatedData.getUsername());
             }
         }
 
-        // 3. Logic for Admin Operator
+        // 5. 分权执行修改逻辑
         if ("ADMIN".equals(operatorRole)) {
-            userToUpdate.setEnabled(updatedData.isEnabled());
-            userToUpdate.setManualLock(!updatedData.isEnabled());
+            // --- 管理员特权分支 ---
 
-            userToUpdate.setUsername(updatedData.getUsername());
-            userToUpdate.setEmail(updatedData.getEmail());
+            // 修复布尔陷阱：只有状态不一致时才切换，避免默认值 false 误伤
+            if (updatedData.isEnabled() != userToUpdate.isEnabled()) {
+                userToUpdate.setEnabled(updatedData.isEnabled());
+                userToUpdate.setManualLock(!updatedData.isEnabled());
+            }
+
+            // 修复 Null 覆盖风险：只有传入非空值才修改
+            if (updatedData.getUsername() != null) {
+                userToUpdate.setUsername(updatedData.getUsername());
+            }
+            if (updatedData.getEmail() != null) {
+                userToUpdate.setEmail(updatedData.getEmail());
+            }
+            if (updatedData.getUserRole() != null) {
+                userToUpdate.setUserRole(updatedData.getUserRole());
+            }
         }
-        // 4. Logic for Regular User Operator
         else {
-            userToUpdate.setEmail(updatedData.getEmail());
-            userToUpdate.setAvatarUrl(updatedData.getAvatarUrl());
-
+            // --- 普通用户自我修改分支 ---
+            if (updatedData.getEmail() != null) {
+                userToUpdate.setEmail(updatedData.getEmail());
+            }
+            if (updatedData.getAvatarUrl() != null) {
+                userToUpdate.setAvatarUrl(updatedData.getAvatarUrl());
+            }
             if (updatedData.getPassword() != null && !updatedData.getPassword().isEmpty()) {
                 userToUpdate.setPassword(passwordEncoder.encode(updatedData.getPassword()));
             }
+            // 普通用户路径下，enabled/username/userRole 保持原样，不予处理
         }
 
+        // 6. 持久化并返回
         User savedUser = userRepository.save(userToUpdate);
         return mapToResponse(savedUser);
     }
 
     public List<UserResponse> getAllUsers() {
-        return userRepository.findAll()
-                .stream()
-                .map(this::mapToResponse)
-                .toList();
+        System.out.println(">>> [JULES DB CHECK] Fetching all users from database...");
+        List<User> users = userRepository.findAll();
+        System.out.println(">>> [JULES DB CHECK] Found users count: " + users.size());
+
+        // 检查第一个用户是否有 Role 缺失
+        if (!users.isEmpty()) {
+            System.out.println(">>> [JULES DB CHECK] Sample User Role: " + users.get(0).getUserRole());
+        }
+
+        return users.stream().map(this::mapToResponse).toList();
     }
 
     public void deleteUser(Long id) {

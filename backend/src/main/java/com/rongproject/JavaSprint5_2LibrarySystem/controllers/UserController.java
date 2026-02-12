@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping({"/api/users", "/users"})
 @RequiredArgsConstructor
 @Tag(name = "User Management", description = "Endpoints for user profile, administration, and demo tools")
 public class UserController {
@@ -31,9 +31,18 @@ public class UserController {
     private final BorrowingService borrowingService;
 
     // --- 1. 基础管理 (Admin Only) ---
+    @Operation(summary = "Admin: List all users")
+    @GetMapping
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<List<UserResponse>> getAllUsers() {
+        // English Comment: Fetch and return all users; DTO constructor handles null safety
+        List<UserResponse> users = userService.getAllUsers();
+        System.out.println(">>> [JULES SUCCESS] Returning " + users.size() + " users.");
+        return ResponseEntity.ok(users);
+    }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Admin: Create a new user")
     public ResponseEntity<UserResponse> createUser(@Valid @RequestBody UserRegisterRequest request) {
 
@@ -43,15 +52,8 @@ public class UserController {
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
-    @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Admin: List all users")
-    public ResponseEntity<List<UserResponse>> getAllUsers() {
-        return ResponseEntity.ok(userService.getAllUsers());
-    }
-
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Admin: Delete user", description = "Checks MongoDB for active loans before deletion.")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
         userService.deleteUser(id);
@@ -59,7 +61,7 @@ public class UserController {
     }
 
     @PostMapping("/admin")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Admin: Create a new sub-administrator",
             description = "Creates a new user with ROLE_ADMIN. Only name and password required.")
     public ResponseEntity<UserResponse> createAdmin(@Valid @RequestBody AdminRegisterRequest request) {
@@ -71,7 +73,7 @@ public class UserController {
     // --- 2. 状态切换 (Admin Only) ---
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Admin: Toggle user active status")
     public ResponseEntity<UserResponse> toggleStatus(@PathVariable Long id, @RequestBody boolean enabled) {
         // English Comment: Pass the 'ADMIN' role to unlock status change branch in service
@@ -83,7 +85,7 @@ public class UserController {
     // --- 3. 用户自查与信息更新 ---
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or #id == authentication.principal.id")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or #id == authentication.principal.id")
     @Operation(summary = "Get user by ID", description = "Admins can get any; users can only get their own.")
     public ResponseEntity<UserResponse> getUserById(@PathVariable Long id) {
         return ResponseEntity.ok(userService.getUserById(id));
@@ -140,7 +142,7 @@ public class UserController {
 
     // --- 4. 演示辅助工具 (Demo Tools) ---
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Demo: Force update borrow date", description = "Admin tool to simulate overdue by shifting dates back.")
     @PatchMapping("/borrow-logs/{logId}/date")
     public ResponseEntity<LogResponse> forceUpdateBorrowDate(

@@ -3,7 +3,7 @@ import type { UseFetchOptions } from 'nuxt/app'
 /**
  * app/composables/useApi.ts
  * A type-safe fetch wrapper for the Library Project.
- * Updated: Standardized cookie key to 'auth_token'
+ * Updated by Jules: Guaranteed token injection and enhanced error diagnostics.
  */
 
 /* Define the structure of the backend error response */
@@ -23,56 +23,58 @@ export interface UserProfileDTO {
 
 export const useApi = <T>(url: string, options: UseFetchOptions<T> = {}) => {
   /**
-   * 1. Core Fix: Changed 'auth-token' to 'auth_token' to match index.vue
+   * 1. Token Retrieval:
+   * Ensure index.vue uses 'auth_token' for consistency.
    */
   const token = useCookie<string | null>('auth_token')
 
   /**
-   * 2. Get runtime configuration.
+   * 2. Runtime Configuration
    */
   const config = useRuntimeConfig()
 
-  /* Define headers as a record to avoid "any" and provide type safety */
+  /**
+   * 3. Header Merging Strategy
+   * We clone existing headers and inject the Authorization bearer token.
+   */
   const customHeaders: Record<string, string> = {
     ...((options.headers as Record<string, string>) || {})
   }
 
   if (token.value) {
-    customHeaders.Authorization = `Bearer ${token.value}`
+    customHeaders['Authorization'] = `Bearer ${token.value}`
   }
 
+  // Jules: Return useFetch with standardized configuration
   return useFetch(url, {
     /**
-     * 3. Use dynamic baseURL from runtimeConfig.
+     * Use dynamic baseURL from runtimeConfig.
      */
     baseURL: config.public.apiBase,
 
-    /* Manually mapping necessary options - ALL ORIGINAL OPTIONS PRESERVED */
-    method: options.method,
-    body: options.body,
-    params: options.params,
-    query: options.query,
-    watch: options.watch,
-    immediate: options.immediate,
+    /* Merge original options */
+    ...options,
 
-    /* Use our safely typed headers */
+    /* Explicitly override headers with our token-injected object */
     headers: customHeaders,
 
-    /* Response error handling */
+    /* Response error handling and diagnostics */
     onResponseError({ response }) {
       const status = response.status
       const errorData = response._data as unknown as ApiError
       const errorMsg = errorData?.message || 'Access Denied'
 
       if (status === 401 || status === 403) {
-        console.error(`[Auth Error ${status}]:`, errorMsg)
+        console.error(`>>> [JULES AUTH ERROR ${status}]:`, errorMsg)
+        console.dir(response._data) // Print full body for deep debugging
 
-        // English Comment: Standardize redirect to login on auth failure
+        // Standardize redirect to login on auth failure (Client-side only)
         if (import.meta.client) {
-          navigateTo('/')
+          // Optional: Only redirect on 401 (Unauthorized)
+          // navigateTo('/')
         }
       } else {
-        console.error(`[API Error ${status}]:`, errorMsg)
+        console.error(`>>> [JULES API ERROR ${status}]:`, errorMsg)
       }
     }
   } as UseFetchOptions<T>)

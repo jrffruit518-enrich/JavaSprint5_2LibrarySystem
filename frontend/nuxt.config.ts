@@ -1,4 +1,4 @@
-// https://nuxt.com/docs/api/configuration/nuxt-config
+// nuxt.config.ts
 export default defineNuxtConfig({
   // --- Modules ---
   modules: [
@@ -12,7 +12,6 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
-  // --- Runtime Config ---
   runtimeConfig: {
     public: {
       apiBase: 'http://localhost:8080'
@@ -21,23 +20,16 @@ export default defineNuxtConfig({
 
   routeRules: {
     '/': { prerender: true },
-    // English Comment: Disable SSR for admin routes to fix instant redirect issues caused by cookie sync
     '/admin/**': { ssr: false }
   },
 
   compatibilityDate: '2025-01-15',
 
-  // --- NEW: Nitro Proxy Configuration ---
-  // English Comment: Standard transparent proxy for local development
   nitro: {
     devProxy: {
-      // 这里的 '/api' 是前端请求的匹配前缀
       '/api': {
-        // target 只写到端口，不要带路径
         target: 'http://localhost:8080',
-        changeOrigin: true,
-        // English Comment: Do NOT rewrite the path, keep /api/users/me as is
-        prependPath: true
+        changeOrigin: true
       }
     }
   },
@@ -49,5 +41,11 @@ export default defineNuxtConfig({
         braceStyle: '1tbs'
       }
     }
+  },
+
+  // --- Jules Fix: Icon Configuration ---
+  // 改变图标加载路径，避免被 nitro 的 /api 代理拦截导致后端 500
+  icon: {
+    localApiEndpoint: '/_icon'
   }
 })

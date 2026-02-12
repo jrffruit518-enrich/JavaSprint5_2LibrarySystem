@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/borrowings")
+@RequestMapping({"/api/borrowings", "/borrowings"})
 @RequiredArgsConstructor
 @Tag(name = "Borrowing Management", description = "Endpoints for borrowing and returning books")
 public class BorrowingController {
@@ -28,7 +28,7 @@ public class BorrowingController {
     private final BorrowingService borrowingService;
 
     @PostMapping("/borrow/{bookId}")
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USER', 'ROLE_ADMIN')")
     @Operation(summary = "Borrow a book")
     public ResponseEntity<LogResponse> borrowBook(
             @PathVariable Long bookId,
@@ -42,7 +42,7 @@ public class BorrowingController {
     }
 
     @PostMapping("/return/{bookId}")
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_USER', 'ROLE_ADMIN')")
     @Operation(summary = "Return a book")
     public ResponseEntity<LogResponse> returnBook(
             @PathVariable Long bookId,

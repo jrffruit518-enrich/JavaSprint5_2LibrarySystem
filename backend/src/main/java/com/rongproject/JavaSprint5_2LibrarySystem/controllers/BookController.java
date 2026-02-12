@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/books")
+@RequestMapping({"/api/books", "/books"})
 @RequiredArgsConstructor
 @Tag(name = "Book Management", description = "Endpoints for managing the book catalog")
 public class BookController {
@@ -35,21 +35,21 @@ public class BookController {
         return ResponseEntity.ok(bookService.getBookById(id));
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Create a new book", description = "Requires ADMIN role in a real scenario.")
     @PostMapping
     public ResponseEntity<BookResponse> createBook(@Valid @RequestBody BookCreationRequest request) {
         return new ResponseEntity<>(bookService.createBook(request), HttpStatus.CREATED);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Update an existing book")
     @PutMapping("/{id}")
     public ResponseEntity<BookResponse> updateBook(@PathVariable Long id, @Valid @RequestBody BookCreationRequest request) {
         return ResponseEntity.ok(bookService.updateBook(id, request));
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Delete a book")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteBook(@PathVariable Long id) {

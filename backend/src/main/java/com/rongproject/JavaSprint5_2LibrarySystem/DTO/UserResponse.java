@@ -21,12 +21,18 @@ public record UserResponse(
         UserRole userRole,
 
         @Schema(description = "Whether the account is currently active and allowed to borrow", example = "true")
-        boolean enabled,
+        Boolean enabled,
 
         // English Comment: If true, the account was locked by an Admin and won't be auto-unlocked by returning books
         @Schema(description = "Manual lock status. If true, only an Admin can unlock this account.", example = "false")
-        boolean manualLock,
+        Boolean manualLock,
 
         @Schema(description = "The URL of the user's profile picture", example = "https://example.com/avatars/user5.png")
         String avatarUrl
-) {}
+) {
+        public UserResponse {
+                if (enabled == null) enabled = true;
+                if (manualLock == null) manualLock = false;
+                if (avatarUrl == null) avatarUrl = ""; // 给 avatar 一个空字符串而非 null
+        }
+}

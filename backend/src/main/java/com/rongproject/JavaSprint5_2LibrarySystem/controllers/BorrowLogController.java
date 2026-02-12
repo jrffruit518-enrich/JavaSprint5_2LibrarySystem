@@ -17,15 +17,15 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/borrow-logs")
+@RequestMapping({"/api/borrow-logs", "/borrow-logs"})
 @RequiredArgsConstructor
 @Tag(name = "Borrowing Log Management", description = "Endpoints for book transactions and log history")
 public class BorrowLogController {
 
     private final BorrowLogService borrowLogService;
 
-    @PostMapping("/borrow/{bookId}")
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @PostMapping("/log-record/{bookId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_USER', 'ROLE_ADMIN')")
     @Operation(summary = "Borrow a book")
     public ResponseEntity<LogResponse> borrowBook(
             @PathVariable Long bookId,
@@ -36,8 +36,8 @@ public class BorrowLogController {
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
-    @PostMapping("/return/{bookId}")
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @PostMapping("/record-return/{bookId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_USER', 'ROLE_ADMIN')")
     @Operation(summary = "Return a book")
     public ResponseEntity<LogResponse> returnBook(
             @PathVariable Long bookId,
@@ -49,21 +49,21 @@ public class BorrowLogController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Get all borrowing logs", description = "Admin only access to all records")
     public ResponseEntity<List<LogResponse>> getAllLogs() {
         return ResponseEntity.ok(borrowLogService.getAllLogs());
     }
 
     @GetMapping("/user/{username}")
-    @PreAuthorize("hasRole('ADMIN') or #username == authentication.name")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or #username == authentication.name")
     @Operation(summary = "Get logs by username", description = "Admin can see any user's logs; Users can only see their own")
     public ResponseEntity<List<LogResponse>> getLogsByUserName(@PathVariable String username) {
         return ResponseEntity.ok(borrowLogService.getLogsByUserName(username));
     }
 
     @PatchMapping("/{recordId}/date-demo")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Update borrow date for demonstration purposes")
     public ResponseEntity<LogResponse> updateBorrowDateForDemo(
             @PathVariable String recordId,

@@ -1,6 +1,5 @@
 package com.rongproject.JavaSprint5_2LibrarySystem.security;
 
-
 import com.rongproject.JavaSprint5_2LibrarySystem.services.CustomUserDetailsService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -17,6 +16,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+/**
+ * 图书馆项目 - JWT 认证过滤器
+ * Jules Fix: Added deep diagnostic logging for authority verification.
+ */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -39,14 +42,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // 3. 根据用户名加载用户详情 (UserDetails)
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
+                // --- JULES DIAGNOSTIC START ---
+                // English Comment: Print authentication details to verify role mapping (e.g., [ROLE_ADMIN])
+                System.out.println(">>> [JULES JWT CHECK] Request URL: " + request.getRequestURI());
+                System.out.println(">>> [JULES JWT CHECK] Authenticated User: " + username);
+                System.out.println(">>> [JULES JWT CHECK] Assigned Authorities: " + userDetails.getAuthorities());
+                // --- JULES DIAGNOSTIC END ---
+
                 // 4. 创建认证令牌，并存入 SecurityContext 上下文
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+            } else if (jwt == null && !request.getRequestURI().contains("/api/auth")) {
+                // Jules: 记录非登录接口但未携带 Token 的请求
+                System.out.println(">>> [JULES JWT CHECK] No JWT found for protected resource: " + request.getRequestURI());
             }
         } catch (Exception e) {
+            // Jules: 捕获并记录认证过程中的异常
+            System.err.println(">>> [JULES JWT ERROR] Cannot set user authentication: " + e.getMessage());
             logger.error("Cannot set user authentication: {}", e);
         }
 

@@ -90,12 +90,10 @@
 <script setup>
 /**
  * 图书馆项目 (Library Project) - 首页 index.vue
- * Core Fix: Standardized Cookie names and paths to ensure cross-page access.
+ * Jules Fix:
+ * 1. Fixed UDivider to USeparator (Nuxt UI v3).
+ * 2. Standardized proxy path /api/auth/login.
  */
-
-/* 1. Configuration & State */
-const config = useRuntimeConfig()
-const apiBase = config.public.apiBase
 
 const isLoginModalOpen = ref(false)
 const loginForm = reactive({
@@ -103,9 +101,8 @@ const loginForm = reactive({
   password: ''
 })
 
-/* 2. Login Logic */
 const handleLogin = async () => {
-  // English Comment: Standardize naming to 'auth_token' and 'user_role' (underscore)
+  // Jules: Cookie 命名与 users.vue 诊断逻辑保持高度一致
   const authCookie = useCookie('auth_token', {
     path: '/',
     maxAge: 60 * 60 * 24,
@@ -118,38 +115,34 @@ const handleLogin = async () => {
   })
 
   try {
-    const response = await $fetch(`${apiBase}/api/auth/login`, {
+    // Jules Fix: 请求路径保持 /api 前缀，后端 AuthController 已配置支持
+    const response = await $fetch('/api/auth/login', {
       method: 'POST',
       body: loginForm
     })
 
     if (response.token) {
-      console.log('Login Success, token received.')
-
-      // Assign values to cookies
+      console.log('>>> [JULES LOGIN] Success, token saved.')
       authCookie.value = response.token
 
-      /**
-       * English Comment: Critical Fix -
-       * Standardize role check logic.
-       */
       let role = 'MEMBER'
+      // Jules: 自动匹配 Spring Security 角色前缀或原始名
       if (loginForm.username === 'admin' || response.role === 'ROLE_ADMIN' || response.role === 'ADMIN') {
         role = 'ADMIN'
       }
       roleCookie.value = role
 
-      console.log('Cookies saved. Redirecting with Role:', role)
       isLoginModalOpen.value = false
 
       if (role === 'ADMIN') {
-        await navigateTo('/admin')
+        // 跳转到我们加了监控条的诊断页面
+        await navigateTo('/admin/users')
       } else {
         await navigateTo('/user')
       }
     }
   } catch (error) {
-    console.error('Login Error:', error)
+    console.error('>>> [JULES LOGIN ERROR]:', error)
     alert('登录失败：账号密码错误或后端服务未就绪')
   }
 }
