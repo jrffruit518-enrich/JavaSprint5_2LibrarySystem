@@ -7,7 +7,7 @@
           <p class="text-sm text-gray-500">Explore our collection. Please sign in to borrow books.</p>
         </div>
         <UButton
-          to="/login"
+          to="/register"
           icon="i-heroicons-arrow-right-on-rectangle"
           label="Sign In to Borrow"
           color="primary"

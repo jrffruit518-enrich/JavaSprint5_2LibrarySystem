@@ -15,13 +15,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
 /**
  * Library Project - Unified Borrowing Service
  * Coordinates MySQL (Book/User) and MongoDB (BorrowLog)
+ * Jules Version 2.7 - Fixed ID Mapping and Message Generation
  */
 @Service
 @RequiredArgsConstructor
@@ -51,11 +51,7 @@ public class BorrowingService {
             throw new IllegalStateException("Book is currently out of stock.");
         }
 
-        // 3. Fetch book details
-        Book book = bookRepository.findById(bookId)
-                .orElseThrow(() -> new ResourceNotFoundException("Book not found."));
-
-        // 4. Record borrow log (MongoDB)
+        // 3. Record borrow log (MongoDB)
         BorrowLog log = BorrowLog.builder()
                 .userId(userId)
                 .bookId(bookId)
@@ -64,45 +60,36 @@ public class BorrowingService {
                 .build();
         BorrowLog savedLog = borrowLogRepository.save(log);
 
-        // 5. Build success response
-        LocalDate dueDate = LocalDate.now().plusDays(LibraryConstants.OVERDUE_DAYS);
-        String message = String.format("Success! %s, you borrowed \"%s\". Due: %s.",
-                user.getUsername(), book.getTitle(), dueDate);
-
+        // 4. Return response via centralized mapper
         return convertToLogResponse(savedLog);
     }
 
     @Transactional
     public LogResponse returnBook(Long userId, Long bookId) {
-        // 1. Fetch user and book
         User user = userRepository.findByIdOrThrow(userId);
         Book book = bookRepository.getBookById(bookId);
 
-        // 2. Find the active borrow log (MongoDB)
+        // Find active record
         BorrowLog log = borrowLogRepository.findFirstByUserIdAndBookIdAndStatusOrderByBorrowDateDesc(
                         userId, bookId, LogStatus.BORROWED)
                 .orElseThrow(() -> new ResourceNotFoundException("No active borrowing record found."));
 
-        // 3. Update MongoDB: Mark as returned
+        // Update MongoDB
         log.setStatus(LogStatus.RETURNED);
         log.setReturnDate(LocalDateTime.now());
         BorrowLog savedLog = borrowLogRepository.save(log);
 
-        // 4. Atomic stock increment (MySQL)
+        // Update MySQL stock
         book.setAvailableStock(book.getAvailableStock() + 1);
         bookRepository.save(book);
 
-        // 5. Automatic status update
         updateUserStatusAfterReturn(userId);
 
         return convertToLogResponse(savedLog);
     }
 
-    // --- Query Methods (Migrated & Refined) ---
+    // --- Query Methods ---
 
-    /**
-     * Admin: Get all records from MongoDB
-     */
     public List<LogResponse> getAllLogs() {
         return borrowLogRepository.findAll()
                 .stream()
@@ -117,17 +104,10 @@ public class BorrowingService {
                 .toList();
     }
 
-    /**
-     * Admin/User: Get logs by username
-     */
     public List<LogResponse> getLogsByUserName(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
-
-        return borrowLogRepository.findByUserId(user.getId())
-                .stream()
-                .map(this::convertToLogResponse)
-                .toList();
+        return getLogsByUserId(user.getId());
     }
 
     public List<LogResponse> getOngoingLoans(Long userId) {
@@ -140,7 +120,6 @@ public class BorrowingService {
 
     public List<LogResponse> getLoanHistory(Long userId, String searchKeyword) {
         List<BorrowLog> history = borrowLogRepository.findByUserIdAndStatus(userId, LogStatus.RETURNED);
-
         return history.stream()
                 .map(this::convertToLogResponse)
                 .filter(log -> searchKeyword == null || searchKeyword.isBlank() ||
@@ -150,13 +129,12 @@ public class BorrowingService {
 
     public UserStatusResponse getUserBorrowingStatus(Long userId) {
         User user = userRepository.findByIdOrThrow(userId);
-
         LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(LibraryConstants.OVERDUE_DAYS);
+
         boolean hasOverdue = borrowLogRepository.existsByUserIdAndStatusAndBorrowDateBefore(
                 userId, LogStatus.BORROWED, thirtyDaysAgo);
         long activeBorrowCount = borrowLogRepository.countByUserIdAndStatus(userId, LogStatus.BORROWED);
 
-        // Auto-enable logic
         if (!user.isEnabled() && !user.isManualLock() && !hasOverdue && activeBorrowCount < LibraryConstants.MAX_BORROW_LIMIT) {
             user.setEnabled(true);
             userRepository.save(user);
@@ -170,23 +148,67 @@ public class BorrowingService {
         );
     }
 
-    // --- Demo & Utility Methods ---
+    // --- Private Mapper (The Solution) ---
 
+    /**
+     * Centralized mapper to LogResponse DTO
+     * English Comment: Maps MongoDB logs to Record DTO with MySQL data hydration.
+     */
+    private LogResponse convertToLogResponse(BorrowLog log) {
+        // Hydrate data from MySQL
+        String bookTitle = bookRepository.findById(log.getBookId())
+                .map(Book::getTitle)
+                .orElse("Unknown Book");
+
+        String username = userRepository.findById(log.getUserId())
+                .map(User::getUsername)
+                .orElse("Unknown User");
+
+        // Dynamic Message Creation
+        String message;
+        if (log.getStatus() == LogStatus.BORROWED) {
+            message = String.format("%s, you successfully borrowed \"%s\".", username, bookTitle);
+        } else {
+            message = String.format("%s, you have returned \"%s\". Status: %s.", username, bookTitle, log.getStatus());
+        }
+
+        // Construct Record with all IDs
+        return new LogResponse(
+                log.getId(),        // logId (String)
+                log.getUserId(),    // userId (Long)
+                username,           // username
+                log.getBookId(),    // bookId (Long)
+                bookTitle,          // bookTitle
+                log.getBorrowDate(),// borrowDate
+                log.getReturnDate(),// returnDate
+                log.getStatus(),    // status
+                message             // message
+        );
+    }
+
+    // --- Demo & Utility Methods (Restored by Jules) ---
+
+    /**
+     * Admin only: Manually update borrow date to simulate overdue scenarios.
+     * English Comment: Essential for testing the 30-day overdue logic without waiting for a month.
+     */
     @Transactional
     public LogResponse updateBorrowDateForDemo(String logId, LocalDateTime newDate) {
+        // 1. Find the log in MongoDB
         BorrowLog log = borrowLogRepository.findById(logId)
                 .orElseThrow(() -> new ResourceNotFoundException("Borrow log not found with id: " + logId));
 
+        // 2. Update the date
         log.setBorrowDate(newDate);
         BorrowLog savedLog = borrowLogRepository.save(log);
 
+        // 3. Return via the new mapper to ensure bookTitle and message are included
         return convertToLogResponse(savedLog);
     }
 
     private void updateUserStatusAfterReturn(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
         if (user.isManualLock()) return;
 
         LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(LibraryConstants.OVERDUE_DAYS);
@@ -196,38 +218,7 @@ public class BorrowingService {
 
         if (!hasOtherOverdue && activeBorrowCount < LibraryConstants.MAX_BORROW_LIMIT) {
             user.setEnabled(true);
-            user.setManualLock(false);
             userRepository.save(user);
         }
-    }
-
-    /**
-     * Centralized mapper to LogResponse DTO
-     */
-    private LogResponse convertToLogResponse(BorrowLog log) {
-        String bookTitle = bookRepository.findById(log.getBookId())
-                .map(Book::getTitle)
-                .orElse("Unknown Book");
-
-        String username = userRepository.findById(log.getUserId())
-                .map(User::getUsername)
-                .orElse("Unknown User");
-
-        String message;
-        if (log.getStatus() == LogStatus.BORROWED) {
-            message = String.format("%s, you have borrowed \"%s\". Please return it on time.", username, bookTitle);
-        } else {
-            message = String.format("%s, you have returned \"%s\". Thank you!", username, bookTitle);
-        }
-
-        return new LogResponse(
-                log.getId(),
-                username,
-                bookTitle,
-                log.getBorrowDate(),
-                log.getReturnDate(),
-                log.getStatus(),
-                message
-        );
     }
 }

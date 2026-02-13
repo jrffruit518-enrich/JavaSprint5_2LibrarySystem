@@ -2,34 +2,38 @@ package com.rongproject.JavaSprint5_2LibrarySystem.DTO;
 
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.LogStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
-
 import java.time.LocalDateTime;
 
 /**
  * Optimized Response DTO for borrowing events.
- * Replaces technical IDs with readable names and adds a user-friendly message.
+ * English Comment: Updated to match BorrowLog entity (Long IDs) and fixed the missing message issue.
  */
-@Schema(description = "Response object detailing a borrowing record with user-friendly messages")
+@Schema(description = "借阅记录响应对象")
 public record LogResponse(
-        @Schema(description = "The unique MongoDB document ID for the log", example = "65c4f1a2b3c4d5e6f7a8b9c0")
+        @Schema(description = "MongoDB 日志ID")
         String logId,
 
-        @Schema(description = "The display name of the user", example = "张三")
+        @Schema(description = "用户ID (来自MySQL)")
+        Long userId,
+
+        @Schema(description = "用户名")
         String username,
 
-        @Schema(description = "The title of the borrowed book", example = "Effective Java")
+        @Schema(description = "图书ID (来自MySQL)")
+        Long bookId,
+
+        @Schema(description = "图书标题")
         String bookTitle,
 
-        @Schema(description = "The date and time when the book was borrowed", example = "2026-02-09T10:00:00")
+        @Schema(description = "借书时间")
         LocalDateTime borrowDate,
 
-        @Schema(description = "The date and time when the book was returned (null if not yet returned)", example = "2026-03-11T10:00:00")
+        @Schema(description = "归还时间 (未归还则为空)")
         LocalDateTime returnDate,
 
-        @Schema(description = "The current status of the borrowing event", example = "BORROWED")
+        @Schema(description = "借阅状态")
         LogStatus status,
 
-        @Schema(description = "A personalized message for the user",
-                example = "张三，你已成功借阅了《Effective Java》，请于 2026-03-11 前归还。")
+        @Schema(description = "前端显示的友好提示消息")
         String message
 ) {}

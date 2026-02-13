@@ -17,6 +17,10 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Library Project - Borrowing Controller
+ * Jules Version 2.8 - Fixed PathMapping and Current User Context
+ */
 @RestController
 @RequestMapping({"/api/borrowings", "/borrowings"})
 @RequiredArgsConstructor
@@ -25,25 +29,41 @@ public class BorrowingController {
 
     private final BorrowingService borrowingService;
 
-    // 1. 借书：调用 BorrowingService (包含 MySQL 扣库存 和 MongoDB 记日志)
+    // 1. 借书
     @PostMapping("/borrow/{bookId}")
     @PreAuthorize("hasAnyAuthority('ROLE_USER', 'ROLE_ADMIN')")
+    @Operation(summary = "Borrow a book (MySQL Stock -1, MongoDB Log +1)")
     public ResponseEntity<LogResponse> borrowBook(
             @PathVariable Long bookId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return new ResponseEntity<>(borrowingService.borrowBook(userDetails.getId(), bookId), HttpStatus.CREATED);
     }
 
-    // 2. 还书：调用 BorrowingService (包含 MySQL 加库存 和 MongoDB 更新日志)
+    // 2. 还书
     @PostMapping("/return/{bookId}")
     @PreAuthorize("hasAnyAuthority('ROLE_USER', 'ROLE_ADMIN')")
+    @Operation(summary = "Return a book (MySQL Stock +1, MongoDB Log Update)")
     public ResponseEntity<LogResponse> returnBook(
             @PathVariable Long bookId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.ok(borrowingService.returnBook(userDetails.getId(), bookId));
     }
 
-    // 3. 管理员查询：调用 BorrowLogService 获取 MongoDB 的全量历史
+    /**
+     * 3. 重要修复：获取当前登录用户的借阅记录
+     * 解决 user/loans 无返回信息的问题
+     * 前端调用路径: /api/borrowings/user/loans
+     */
+    @GetMapping("/user/loans")
+    @PreAuthorize("hasAnyAuthority('ROLE_USER', 'ROLE_ADMIN')")
+    @Operation(summary = "Get current user's borrowing history")
+    public ResponseEntity<List<LogResponse>> getCurrentUserLoans(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        // English Comment: Extracting userId from security context to ensure data privacy
+        return ResponseEntity.ok(borrowingService.getLogsByUserId(userDetails.getId()));
+    }
+
+    // 4. 管理员查询：全量历史
     @GetMapping("/all-logs")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Admin: Get all borrowing history from MongoDB")
@@ -51,30 +71,38 @@ public class BorrowingController {
         return ResponseEntity.ok(borrowingService.getAllLogs());
     }
 
-    // 4. 用户/管理员查询：按用户名获取日志
+    // 5. 按用户名查询 (供管理员在搜索框使用)
     @GetMapping("/user-logs/{username}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or #username == authentication.name")
+    @Operation(summary = "Get logs by specific username")
     public ResponseEntity<List<LogResponse>> getLogsByUserName(@PathVariable String username) {
         return ResponseEntity.ok(borrowingService.getLogsByUserName(username));
     }
 
-    // 5. 资格检查
+    // 6. 资格检查
     @GetMapping("/{userId}/status")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or #userId == principal.id")
+    @Operation(summary = "Check if user is eligible to borrow")
     public ResponseEntity<UserStatusResponse> getStatus(@PathVariable Long userId) {
         return ResponseEntity.ok(borrowingService.getUserBorrowingStatus(userId));
     }
 
-    // 6. Demo 日期修改：调用 BorrowingService 的 demo 方法
+    // 7. Demo 日期修改
     @PatchMapping("/{recordId}/date-demo")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @Operation(summary = "Admin: Update date for testing overdue logic")
     public ResponseEntity<LogResponse> updateBorrowDateForDemo(
             @PathVariable String recordId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime newBorrowDate) {
         return ResponseEntity.ok(borrowingService.updateBorrowDateForDemo(recordId, newBorrowDate));
     }
 
-    // 在 BorrowingController.java 中
-    @GetMapping("/user/{userId}")  // 这样完整路径就是 /api/borrowings/user/1
+    /**
+     * 8. 按用户ID查询 (保留但修正权限)
+     * 路径: /api/borrowings/user/1
+     */
+    @GetMapping("/user/{userId}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or #userId == principal.id")
     public ResponseEntity<List<LogResponse>> getUserLogs(@PathVariable Long userId) {
         return ResponseEntity.ok(borrowingService.getLogsByUserId(userId));
     }

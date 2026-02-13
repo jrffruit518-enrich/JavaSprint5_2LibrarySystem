@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * 图书馆项目 - My Loans (Jules v8 Final - Path Aligned)
- * 1. 匹配后端 Controller 的新路径: /api/borrowings/user/{id}
- * 2. 修正还书接口为 RESTful 风格: /api/borrowings/return/{id}
+ * 图书馆项目 - My Loans (Jules v9 - Optimized)
+ * 1. 修正 userId 类型转换，解决 MongoDB 查询空结果问题
+ * 2. 规范 API 路径拼接，防止 404
  */
 
 definePageMeta({
@@ -10,14 +10,17 @@ definePageMeta({
   middleware: 'auth'
 })
 
-// 获取 Cookie 中的用户 ID
-const userId = useCookie('user_id') 
+// --- 1. 用户 ID 处理 ---
+// 获取 Cookie 中的原始值并强制转为数字，以匹配后端 Long 类型
+const userIdRaw = useCookie('user_id')
+const userId = computed(() => (userIdRaw.value ? Number(userIdRaw.value) : null))
+
 const searchQuery = ref('')
 
-// --- 1. 数据获取 ---
-// 路径对齐：/api/borrowings/user/{userId}
+// --- 2. 数据获取 ---
+// 路径去掉首斜杠，由 useApi 自动拼接 baseURL (/api)
 const { data: loans, refresh, status } = await useApi<any[]>(() => 
-  userId.value ? `/borrowings/user/${userId.value}` : null
+  userId.value ? `borrowings/user/${userId.value}` : null
 )
 
 const tabs = [
@@ -38,8 +41,9 @@ const historyColumns = [
   { key: 'status', label: 'Status' }
 ]
 
-// 数据过滤逻辑
+// --- 3. 数据过滤逻辑 ---
 const activeLoans = computed(() => {
+  // 如果 status 返回的是小写或对象，请确保此处匹配后端 LogStatus 枚举的字符串
   return (loans.value || []).filter(l => l.status === 'BORROWED')
 })
 
@@ -49,15 +53,16 @@ const filteredHistory = computed(() => {
   return history.filter(l => l.bookTitle.toLowerCase().includes(searchQuery.value.toLowerCase()))
 })
 
-// --- 2. 交互逻辑 ---
+// --- 4. 交互逻辑 ---
 const handleReturn = async (bookId: number) => {
   if (!confirm('Confirm to return this book?')) return
   
   try {
-    // English Comment: Match backend @PostMapping("/return/{bookId}")
+    const token = useCookie('auth_token').value
+    // 路径对齐后端 @PostMapping("/return/{bookId}")
     await $fetch(`/api/borrowings/return/${bookId}`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${useCookie('auth_token').value}` }
+      headers: { Authorization: `Bearer ${token}` }
     })
     
     alert('Book returned successfully!')
