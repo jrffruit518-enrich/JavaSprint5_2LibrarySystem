@@ -2,6 +2,9 @@ package com.rongproject.JavaSprint5_2LibrarySystem.controllers;
 
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.LogResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserStatusResponse;
+import com.rongproject.JavaSprint5_2LibrarySystem.entities.BorrowLog;
+import com.rongproject.JavaSprint5_2LibrarySystem.enums.LogStatus;
+import com.rongproject.JavaSprint5_2LibrarySystem.repositories.BorrowLogRepository;
 import com.rongproject.JavaSprint5_2LibrarySystem.security.CustomUserDetails;
 import com.rongproject.JavaSprint5_2LibrarySystem.services.BorrowingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,6 +31,8 @@ import java.util.List;
 public class BorrowingController {
 
     private final BorrowingService borrowingService;
+    private final BorrowLogRepository borrowLogRepository;
+
 
     // 1. 借书
     @PostMapping("/borrow/{bookId}")
@@ -54,13 +59,36 @@ public class BorrowingController {
      * 解决 user/loans 无返回信息的问题
      * 前端调用路径: /api/borrowings/user/loans
      */
+    @Operation(summary = "Get current user's borrowing history") // 建议保留，规范接口文档
     @GetMapping("/user/loans")
     @PreAuthorize("hasAnyAuthority('ROLE_USER', 'ROLE_ADMIN')")
-    @Operation(summary = "Get current user's borrowing history")
-    public ResponseEntity<List<LogResponse>> getCurrentUserLoans(
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
-        // English Comment: Extracting userId from security context to ensure data privacy
-        return ResponseEntity.ok(borrowingService.getLogsByUserId(userDetails.getId()));
+    public ResponseEntity<List<LogResponse>> getUserLoans(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        if (userDetails == null) {
+            System.out.println(">>> [JULES ERROR] UserDetails is NULL!");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        Long userId = userDetails.getId();
+        System.out.println(">>> [JULES] Checking loans for userId: " + userId
+                + " | username: " + userDetails.getUsername());
+
+        // ── 新增：直接数有多少条符合条件的记录 ──
+        long countDirect = borrowLogRepository.countByUserIdAndStatus(userId, LogStatus.BORROWED);
+        System.out.println(">>> [JULES] countByUserIdAndStatus(BORROWED) = " + countDirect);
+
+        List<BorrowLog> raw = borrowLogRepository.findByUserId(userId);
+        System.out.println(">>> [JULES] findByUserId returned " + raw.size() + " raw documents");
+
+        if (!raw.isEmpty()) {
+            BorrowLog first = raw.get(0);
+            System.out.println(">>> [JULES] First log → user_id type: " + first.getUserId().getClass().getSimpleName()
+                    + " | value: " + first.getUserId());
+        }
+
+        List<LogResponse> response = borrowingService.getLogsByUserId(userId);
+        System.out.println(">>> [JULES] Final response size: " + response.size());
+
+        return ResponseEntity.ok(response);
     }
 
     // 4. 管理员查询：全量历史

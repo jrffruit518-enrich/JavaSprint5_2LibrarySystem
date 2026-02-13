@@ -173,7 +173,7 @@ public class BorrowingService {
         }
 
         // Construct Record with all IDs
-        return new LogResponse(
+        LogResponse response = new LogResponse(
                 log.getId(),        // logId (String)
                 log.getUserId(),    // userId (Long)
                 username,           // username
@@ -183,7 +183,12 @@ public class BorrowingService {
                 log.getReturnDate(),// returnDate
                 log.getStatus(),    // status
                 message             // message
+
         );
+        // Jules 诊断点：如果这行没打印，说明上面某行报错了
+        System.out.println(">>> [JULES] Converted Log ID: " + log.getId() + " | Book: " + bookTitle);
+
+        return response;
     }
 
     // --- Demo & Utility Methods (Restored by Jules) ---

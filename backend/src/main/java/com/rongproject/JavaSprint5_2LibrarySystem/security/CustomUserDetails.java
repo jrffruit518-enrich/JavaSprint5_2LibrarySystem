@@ -9,67 +9,28 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.Collections;
 
-/**
- * 图书馆项目 - Custom UserDetails
- * Jules Fix: Fixed boolean getter naming and fulfilled UserDetails interface.
- */
 public class CustomUserDetails implements UserDetails {
-
-    @Getter
+    @Getter // 必须确保有这个 Getter，Controller 才能拿到 id
     private final Long id;
     private final String username;
     private final String password;
-    private final boolean enabled;
     private final Collection<? extends GrantedAuthority> authorities;
 
     public CustomUserDetails(User user) {
-        this.id = user.getId();
+        this.id = user.getId(); // 修复点：确保这里拿到了 MySQL 里的 Long ID
         this.username = user.getUsername();
         this.password = user.getPassword();
-
-        // Jules Fix: Lombok generates 'isEnabled()' for boolean fields, not 'getEnabled()'
-        this.enabled = user.isEnabled();
-
-        // Jules Fix: Directly use "ROLE_ADMIN" from enum
-        this.authorities = Collections.singletonList(
-                new SimpleGrantedAuthority(user.getUserRole().name())
-        );
+        // 确保角色前缀匹配 ROLE_
+        String roleName = user.getUserRole().name();
+        String finalRole = roleName.startsWith("ROLE_") ? roleName : "ROLE_" + roleName;
+        this.authorities = Collections.singletonList(new SimpleGrantedAuthority(finalRole));
     }
 
-    @Override
-    public Collection<? extends GrantedAuthority> getAuthorities() {
-        return authorities;
-    }
-
-    @Override
-    public String getPassword() {
-        return password;
-    }
-
-    @Override
-    public String getUsername() {
-        return username;
-    }
-
-    // --- 以下是 UserDetails 接口必须实现的方法，否则会报错 ---
-
-    @Override
-    public boolean isAccountNonExpired() {
-        return true; // 账号永不过期
-    }
-
-    @Override
-    public boolean isAccountNonLocked() {
-        return true; // 账号未锁定
-    }
-
-    @Override
-    public boolean isCredentialsNonExpired() {
-        return true; // 凭证永不过期
-    }
-
-    @Override
-    public boolean isEnabled() {
-        return enabled; // 使用数据库中的状态
-    }
+    @Override public Collection<? extends GrantedAuthority> getAuthorities() { return authorities; }
+    @Override public String getPassword() { return password; }
+    @Override public String getUsername() { return username; }
+    @Override public boolean isAccountNonExpired() { return true; }
+    @Override public boolean isAccountNonLocked() { return true; }
+    @Override public boolean isCredentialsNonExpired() { return true; }
+    @Override public boolean isEnabled() { return true; }
 }

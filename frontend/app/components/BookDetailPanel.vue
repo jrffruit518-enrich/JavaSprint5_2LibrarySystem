@@ -28,7 +28,7 @@
             v-if="mode !== 'view'"
             icon="i-lucide-eye"
             size="xs"
-            color="neutral"
+            color="white"
             label="Cancel"
             @click="$emit('change-mode', 'view')"
           />
@@ -38,7 +38,7 @@
 
     <div
       v-if="!book.id && mode !== 'add'"
-      class="py-10 text-center text-muted italic"
+      class="py-10 text-center text-gray-500 italic"
     >
       Select a book from the inventory to see its full specifications.
     </div>
@@ -68,7 +68,7 @@
           </div>
         </div>
 
-        <UFormField
+        <UFormGroup
           v-if="mode !== 'view' && role === 'admin'"
           label="Image Path"
           class="mt-4"
@@ -78,7 +78,7 @@
             size="sm"
             placeholder="/covers/example.jpg"
           />
-        </UFormField>
+        </UFormGroup>
       </div>
 
       <div class="flex-1 space-y-4 text-sm">
@@ -222,8 +222,8 @@
 
 <script setup lang="ts">
 /**
- * 图书馆项目 - Book Detail Panel
- * Jules Fix: Refactored for Nuxt 4 and Nuxt UI v3 standards.
+ * Library Project - Book Detail Panel
+ * English Comment: Fixed UFormField error by using UFormGroup (Standard Nuxt UI).
  */
 import type { Book } from '~/types/book'
 
@@ -251,7 +251,6 @@ const coverUrl = computed(() => {
   return `${apiBase}${path}`
 })
 
-// English Comment: Standard deep watcher for props sync
 watch(() => props.book, (newVal) => {
   localBook.value = { ...newVal }
   isImageLoaded.value = false

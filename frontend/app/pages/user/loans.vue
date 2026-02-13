@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * 图书馆项目 - My Loans (Jules v9 - Optimized)
- * 1. 修正 userId 类型转换，解决 MongoDB 查询空结果问题
- * 2. 规范 API 路径拼接，防止 404
+ * 图书馆项目 - My Loans (Jules v10 - Path Synchronization)
+ * 1. 核心修复：API 路径修正为 'borrowings/user/loans'
+ * 2. 移除 URL 传参：后端现在通过 JWT Token 自动识别用户，不再依赖 URL 中的 userId
  */
 
 definePageMeta({
@@ -10,18 +10,12 @@ definePageMeta({
   middleware: 'auth'
 })
 
-// --- 1. 用户 ID 处理 ---
-// 获取 Cookie 中的原始值并强制转为数字，以匹配后端 Long 类型
-const userIdRaw = useCookie('user_id')
-const userId = computed(() => (userIdRaw.value ? Number(userIdRaw.value) : null))
-
 const searchQuery = ref('')
 
-// --- 2. 数据获取 ---
-// 路径去掉首斜杠，由 useApi 自动拼接 baseURL (/api)
-const { data: loans, refresh, status } = await useApi<any[]>(() => 
-  userId.value ? `borrowings/user/${userId.value}` : null
-)
+// --- 1. 数据获取 ---
+// Jules Fix: 路径必须严格匹配后端的 @GetMapping("/user/loans")
+// 后端逻辑：Controller 会提取 Token 里的 ID，然后去 MongoDB 查记录
+const { data: loans, refresh, status } = await useApi<any[]>('borrowings/user/loans')
 
 const tabs = [
   { label: 'Active Loans', slot: 'active', icon: 'i-heroicons-bookmark' },
@@ -41,19 +35,19 @@ const historyColumns = [
   { key: 'status', label: 'Status' }
 ]
 
-// --- 3. 数据过滤逻辑 ---
+// --- 2. 数据过滤逻辑 ---
 const activeLoans = computed(() => {
-  // 如果 status 返回的是小写或对象，请确保此处匹配后端 LogStatus 枚举的字符串
-  return (loans.value || []).filter(l => l.status === 'BORROWED')
+  // 后端返回的 status 通常是大写的 'BORROWED'
+  return (loans.value || []).filter(l => String(l.status).toUpperCase() === 'BORROWED')
 })
 
 const filteredHistory = computed(() => {
-  const history = (loans.value || []).filter(l => l.status === 'RETURNED')
+  const history = (loans.value || []).filter(l => String(l.status).toUpperCase() === 'RETURNED')
   if (!searchQuery.value) return history
   return history.filter(l => l.bookTitle.toLowerCase().includes(searchQuery.value.toLowerCase()))
 })
 
-// --- 4. 交互逻辑 ---
+// --- 3. 交互逻辑 ---
 const handleReturn = async (bookId: number) => {
   if (!confirm('Confirm to return this book?')) return
   
@@ -93,6 +87,10 @@ const formatDate = (dateStr: string) => {
       />
     </div>
 
+    <div v-if="loans && loans.length > 0" class="p-2 bg-gray-900 text-green-400 text-[10px] font-mono rounded">
+      DEBUG: Received {{ loans.length }} records. Example: {{ loans[0].bookTitle }}
+    </div>
+
     <UCard>
       <UTabs :items="tabs" class="w-full">
         <template #active>
@@ -101,7 +99,7 @@ const formatDate = (dateStr: string) => {
               <template #bookTitle-data="{ row }">
                 <div class="flex items-center gap-3">
                   <UIcon name="i-heroicons-book-open" class="text-primary w-5 h-5" />
-                  <span class="font-medium text-gray-700">{{ row.bookTitle }}</span>
+                  <span class="font-medium text-gray-700 dark:text-gray-200">{{ row.bookTitle }}</span>
                 </div>
               </template>
               <template #borrowDate-data="{ row }">
