@@ -2,11 +2,13 @@ package com.rongproject.JavaSprint5_2LibrarySystem.service;
 
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.AdminRegisterRequest;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserProfileDTO;
+import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserProfileRequest;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.entities.User;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.LogStatus;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.UserRole;
 import com.rongproject.JavaSprint5_2LibrarySystem.exceptions.AlreadyExistsException;
+import com.rongproject.JavaSprint5_2LibrarySystem.exceptions.ForbiddenException;
 import com.rongproject.JavaSprint5_2LibrarySystem.exceptions.ResourceNotFoundException;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.BorrowLogRepository;
 import com.rongproject.JavaSprint5_2LibrarySystem.repositories.UserRepository;
@@ -90,20 +92,16 @@ public class UserServiceTest {
     // --- 2. updateUser Tests (Crucial Logic) ---
 
     @Test
-    @DisplayName("updateUser - Admin sets status and triggers ManualLock")
-    void updateUser_AdminLockingUser() {
-        // English Comment: Mock existing user in DB
-        when(userRepository.findByIdOrThrow(1L)).thenReturn(mockUser);
+    @DisplayName("toggleUserStatus - Admin sets status and triggers ManualLock")
+    void toggleUserStatus_AdminLockingUser() {
+        // 1. Mock 现有用户
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser));
+        when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
 
-        // English Comment: Admin wants to disable the user
-        User updateData = new User();
-        updateData.setEnabled(false);
+        // 2. 调用新拆分的方法
+        userService.toggleUserStatus(1L, false);
 
-        when(userRepository.save(any(User.class))).thenReturn(mockUser);
-
-        UserResponse response = userService.updateUser(1L, updateData, "ADMIN");
-
-        // English Comment: Verify that disabling as ADMIN sets manualLock to true
+        // 3. 验证逻辑：禁用用户应自动开启 manualLock
         assertFalse(mockUser.isEnabled());
         assertTrue(mockUser.isManualLock());
         verify(userRepository).save(mockUser);
@@ -112,36 +110,36 @@ public class UserServiceTest {
     @Test
     @DisplayName("updateUser - Fail when Email is taken by another user")
     void updateUser_Fail_EmailTaken() {
-        when(userRepository.findByIdOrThrow(1L)).thenReturn(mockUser);
+        // 1. Mock 环境
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser));
 
-        User updateData = new User();
-        updateData.setEmail("other@example.com");
-
+        // 2. 构造 DTO
+        UserProfileRequest request = new UserProfileRequest("other@example.com", null, null);
         when(userRepository.existsByEmail("other@example.com")).thenReturn(true);
 
-        // Changed from IllegalStateException to AlreadyExistsException
+        // 3. 断言异常
         assertThrows(AlreadyExistsException.class, () ->
-                userService.updateUser(1L, updateData, "USER")
+                userService.updateUser(1L, request, "USER")
         );
     }
 
 
 
     @Test
-    @DisplayName("updateUser - Root Admin cannot be disabled")
-    void updateUser_RootAdminProtection() {
+    @DisplayName("toggleUserStatus - Root Admin cannot be disabled")
+    void toggleUserStatus_RootAdminProtection() {
+        // 1. 设置用户为 admin
         mockUser.setUsername("admin");
-        when(userRepository.findByIdOrThrow(1L)).thenReturn(mockUser);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser));
 
-        User updateData = new User();
-        updateData.setEnabled(false);
-
-        Exception exception = assertThrows(RuntimeException.class, () ->
-                userService.updateUser(1L, updateData, "ADMIN")
+        // 2. 验证调用 toggleUserStatus 时抛出 ForbiddenException
+        ForbiddenException exception = assertThrows(ForbiddenException.class, () ->
+                userService.toggleUserStatus(1L, false)
         );
-        assertTrue(exception.getMessage().contains("root admin"));
-    }
 
+        // 3. 验证错误信息
+        assertTrue(exception.getMessage().contains("Root admin status cannot be changed"));
+    }
     // --- 3. deleteUser Tests ---
 
     @Test

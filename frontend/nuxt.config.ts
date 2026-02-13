@@ -1,29 +1,23 @@
-// nuxt.config.ts
 export default defineNuxtConfig({
-  // --- Modules ---
+  // 保持你 GitHub 上的模块配置
   modules: [
-    '@nuxt/eslint',
-    '@nuxt/ui'
+    '@nuxt/ui' 
+    // 先不加 eslint，等跑通后再加，避免干扰
   ],
 
-  devtools: {
-    enabled: true
-  },
+  devtools: { enabled: true },
 
   css: ['~/assets/css/main.css'],
 
   runtimeConfig: {
     public: {
-      apiBase: 'http://localhost:8080'
+      // 在开发环境，我们通过 Nitro Proxy 访问，所以直接写 /api
+      apiBase: '/api'
     }
   },
 
-  routeRules: {
-    '/': { prerender: true },
-    '/admin/**': { ssr: false }
-  },
-
-  compatibilityDate: '2025-01-15',
+  // 这里的日期改为你今天的日期，解决之前的报错
+  compatibilityDate: '2026-02-13',
 
   nitro: {
     devProxy: {
@@ -34,17 +28,7 @@ export default defineNuxtConfig({
     }
   },
 
-  eslint: {
-    config: {
-      stylistic: {
-        commaDangle: 'never',
-        braceStyle: '1tbs'
-      }
-    }
-  },
-
-  // --- Jules Fix: Icon Configuration ---
-  // 改变图标加载路径，避免被 nitro 的 /api 代理拦截导致后端 500
+  // 必须保留这个 Jules Fix，防止图标加载失败
   icon: {
     localApiEndpoint: '/_icon'
   }

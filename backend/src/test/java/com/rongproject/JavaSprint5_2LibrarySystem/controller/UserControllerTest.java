@@ -26,8 +26,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
+import static org.mockito.internal.verification.VerificationModeFactory.times;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -123,34 +123,50 @@ public class UserControllerTest {
     @Test
     @DisplayName("PATCH /api/users/{id}/status - Admin can toggle status")
     void toggleStatus_AdminSuccess() throws Exception {
-        when(userService.updateUser(eq(2L), any(User.class), eq("ADMIN"))).thenReturn(mockUserResponse);
+        // 1. 修正 Mock 目标方法为 toggleUserStatus
+        // 确保 mockUserResponse 已经提前定义好
+        when(userService.toggleUserStatus(eq(2L), eq(true))).thenReturn(mockUserResponse);
+
+        // 2. 匹配 Controller 的 JSON 接收格式
+        // 如果你按照建议使用了 Map 接收，这里要传 JSON 对象 {"enabled": true}
+        // 如果你依然直接接收 boolean，则保持 "true"
+        String jsonContent = "{\"enabled\": true}";
 
         mockMvc.perform(patch("/api/users/2/status")
                         .with(csrf())
-                        .with(user(adminPrincipal))
+                        .with(user(adminPrincipal)) // 模拟管理员权限
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("true"))
+                        .content(jsonContent))
                 .andExpect(status().isOk());
+
+        // 3. 验证 Service 方法是否被准确调用了一次
+        verify(userService, times(1)).toggleUserStatus(2L, true);
     }
 
     @Test
-    @DisplayName("PUT /api/users/me - User can update own profile")
+    @DisplayName("PUT /api/users/profile - User can update own profile")
     void updateSelf_Success() throws Exception {
-        // 修正 avatarUrl 为合法的 URL 格式
+        // 1. 使用 UserProfileRequest DTO
         UserProfileRequest request = new UserProfileRequest(
                 "new@example.com",
                 "https://example.com/new_avatar.png",
-                "123456"
+                "newStrongPassword123"
         );
 
-        when(userService.updateUser(eq(2L), any(User.class), eq("USER"))).thenReturn(mockUserResponse);
+        // 2. Mock 目标改为 UserProfileRequest，并匹配新的返回值
+        when(userService.updateUser(eq(2L), any(UserProfileRequest.class), eq("USER")))
+                .thenReturn(mockUserResponse);
 
-        mockMvc.perform(put("/api/users/me")
+        // 3. 路径改为 /api/users/profile
+        mockMvc.perform(put("/api/users/profile")
                         .with(csrf())
-                        .with(user(userPrincipal))
+                        .with(user(userPrincipal)) // 这里的 userPrincipal.id 应为 2L
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value(mockUserResponse.email()));
+
+        verify(userService, times(1)).updateUser(eq(2L), any(UserProfileRequest.class), eq("USER"));
     }
 
     // --- 3. Security Boundary Tests ---
@@ -282,18 +298,22 @@ public class UserControllerTest {
     }
 
     @Test
-    @DisplayName("PUT /api/users/me - Failure: Email already taken")
+    @DisplayName("PUT /api/users/profile - Failure: Email already taken")
     void updateSelf_EmailConflict() throws Exception {
+        // 1. 准备请求数据
         UserProfileRequest request = new UserProfileRequest("taken@example.com", null, null);
 
-        when(userService.updateUser(eq(2L), any(User.class), eq("USER")))
+        // 2. 修正 Mock：参数类型改为 UserProfileRequest.class
+        when(userService.updateUser(eq(2L), any(UserProfileRequest.class), eq("USER")))
                 .thenThrow(new AlreadyExistsException("Email already taken"));
 
-        mockMvc.perform(put("/api/users/me")
+        // 3. 修正路径：从 /me 改为 /profile
+        mockMvc.perform(put("/api/users/profile")
                         .with(csrf())
                         .with(user(userPrincipal))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict()) // 验证返回 409 Conflict
+                .andExpect(jsonPath("$.message").value("Email already taken")); // 假设 GlobalExceptionHandler 返回 message 字段
     }
 }

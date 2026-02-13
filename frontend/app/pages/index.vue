@@ -2,34 +2,34 @@
   <div class="flex flex-col items-center justify-center py-20">
     <div class="text-center mb-10">
       <UIcon
-        name="i-lucide-library"
+        name="i-heroicons-building-library"
         class="w-16 h-16 text-primary mx-auto mb-4"
       />
-      <h1 class="text-4xl font-bold text-highlighted">
+      <h1 class="text-4xl font-bold text-green-500">
         Library Management System
       </h1>
-      <p class="text-muted mt-2">
+      <p class="text-gray-500 mt-2">
         Welcome! Please manage your collection or start reading.
       </p>
     </div>
 
-    <UCard class="w-full max-w-sm bg-elevated">
+    <UCard class="w-full max-w-sm border-2 border-primary/10 shadow-xl">
       <div class="flex flex-col gap-4">
         <UButton
           to="/register"
           size="xl"
-          icon="i-lucide-user-plus"
+          icon="i-heroicons-user-plus"
           block
         >
           Create New Account
         </UButton>
 
-        <USeparator label="OR" />
+        <UDivider label="OR" />
 
         <UButton
           size="xl"
           variant="outline"
-          icon="i-lucide-log-in"
+          icon="i-heroicons-arrow-left-on-rectangle"
           block
           @click="isLoginModalOpen = true"
         >
@@ -38,36 +38,36 @@
       </div>
     </UCard>
 
-    <UModal
-      v-model:open="isLoginModalOpen"
-      title="User Login"
-    >
-      <template #content>
+    <UModal v-model="isLoginModalOpen">
+      <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
+        <template #header>
+          <div class="flex items-center gap-2">
+            <UIcon name="i-heroicons-lock-closed" class="text-primary" />
+            <h3 class="text-base font-semibold">User Login</h3>
+          </div>
+        </template>
+
         <UForm
           :state="loginForm"
           class="space-y-4"
           @submit="handleLogin"
         >
-          <UFormField
-            label="Username"
-            name="username"
-          >
+          <UFormGroup label="Username" name="username" required>
             <UInput
               v-model="loginForm.username"
-              placeholder="e.g. admin"
+              placeholder="Enter your username"
+              icon="i-heroicons-user"
               autofocus
             />
-          </UFormField>
+          </UFormGroup>
 
-          <UFormField
-            label="Password"
-            name="password"
-          >
+          <UFormGroup label="Password" name="password" required>
             <UInput
               v-model="loginForm.password"
               type="password"
+              icon="i-heroicons-key"
             />
-          </UFormField>
+          </UFormGroup>
 
           <div class="flex justify-end gap-3 mt-6">
             <UButton
@@ -79,71 +79,74 @@
               type="submit"
               label="Sign In"
               color="primary"
+              :loading="isPending"
             />
           </div>
         </UForm>
-      </template>
+      </UCard>
     </UModal>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 /**
- * 图书馆项目 (Library Project) - 首页 index.vue
- * Jules Fix:
- * 1. Fixed UDivider to USeparator (Nuxt UI v3).
- * 2. Standardized proxy path /api/auth/login.
+ * 图书馆项目 - 登录入口 (Standard v3)
+ * Jules Fix: 
+ * 1. 注入 user_id Cookie 以便后续页面调用 MongoDB。
+ * 2. 统一 Cookie 配置。
  */
 
 const isLoginModalOpen = ref(false)
+const isPending = ref(false)
 const loginForm = reactive({
   username: '',
   password: ''
 })
 
 const handleLogin = async () => {
-  // Jules: Cookie 命名与 users.vue 诊断逻辑保持高度一致
-  const authCookie = useCookie('auth_token', {
-    path: '/',
-    maxAge: 60 * 60 * 24,
-    sameSite: 'lax'
-  })
-  const roleCookie = useCookie('user_role', {
-    path: '/',
-    maxAge: 60 * 60 * 24,
-    sameSite: 'lax'
-  })
+  isPending.value = true
+  
+  // Cookie 配置统一设置
+  const cookieOptions = { path: '/', maxAge: 86400, sameSite: 'lax' as const }
+  const authCookie = useCookie('auth_token', cookieOptions)
+  const roleCookie = useCookie('user_role', cookieOptions)
+  const userIdCookie = useCookie('user_id', cookieOptions) // Jules Fix: 新增 ID Cookie
 
   try {
-    // Jules Fix: 请求路径保持 /api 前缀，后端 AuthController 已配置支持
-    const response = await $fetch('/api/auth/login', {
+    const response = await $fetch<any>('/api/auth/login', {
       method: 'POST',
       body: loginForm
     })
 
     if (response.token) {
-      console.log('>>> [JULES LOGIN] Success, token saved.')
+      // 1. 存储 Token
       authCookie.value = response.token
-
-      let role = 'MEMBER'
-      // Jules: 自动匹配 Spring Security 角色前缀或原始名
-      if (loginForm.username === 'admin' || response.role === 'ROLE_ADMIN' || response.role === 'ADMIN') {
-        role = 'ADMIN'
+      
+      // 2. 存储 User ID (关键修复：从后端响应中提取 id)
+      // 如果你的后端返回的字段是 response.id，这里就对了
+      userIdCookie.value = response.id 
+      
+      // 3. 存储角色逻辑
+      let role = response.role || (loginForm.username === 'admin' ? 'ROLE_ADMIN' : 'ROLE_MEMBER')
+      if (!role.startsWith('ROLE_')) {
+        role = `ROLE_${role.toUpperCase()}`
       }
       roleCookie.value = role
 
       isLoginModalOpen.value = false
 
-      if (role === 'ADMIN') {
-        // 跳转到我们加了监控条的诊断页面
-        await navigateTo('/admin/users')
+      // 4. 跳转逻辑
+      if (role === 'ROLE_ADMIN') {
+        await navigateTo('/admin')
       } else {
-        await navigateTo('/user')
+        await navigateTo('/user/books')
       }
     }
-  } catch (error) {
-    console.error('>>> [JULES LOGIN ERROR]:', error)
-    alert('登录失败：账号密码错误或后端服务未就绪')
+  } catch (error: any) {
+    console.error('Login Error:', error)
+    alert(error.data?.message || 'Login failed. Please check your credentials.')
+  } finally {
+    isPending.value = false
   }
 }
 </script>

@@ -22,11 +22,9 @@ public record UserProfileRequest(
         String password
 ) {
     // English Comment: Convert DTO to Entity for Service layer processing
-    public User toEntity() {
-        User user = new User();
-        user.setEmail(this.email);
-        user.setAvatarUrl(this.avatarUrl);
-        user.setPassword(this.password); // Note: Encoding will happen in Service
-        return user;
+    public void updateExistingUser(User existingUser) {
+        if (this.email != null) existingUser.setEmail(this.email);
+        if (this.avatarUrl != null) existingUser.setAvatarUrl(this.avatarUrl);
+        // Note: Password update should be handled separately in Service for encoding
     }
 }

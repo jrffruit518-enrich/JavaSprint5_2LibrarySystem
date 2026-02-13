@@ -1,13 +1,18 @@
 <template>
-  <UApp>
+  <div>
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>
-  </UApp>
+    
+    <UNotifications />
+  </div>
 </template>
 
 <script setup>
-/* 可以在这里保留全局的 SEO 设置 */
+/**
+ * Global Configuration for Library System
+ * Updated for Nuxt 4 & UI v2
+ */
 useSeoMeta({
   title: 'Library System',
   description: 'Manage your books with ease.'

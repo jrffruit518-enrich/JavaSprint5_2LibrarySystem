@@ -1,161 +1,141 @@
 <template>
-  <ClientOnly>
+  <UContainer class="py-6">
     <div class="space-y-6">
-      <AppBreadcrumb current-page-title="Book Management" />
-
-      <div class="flex items-center justify-between">
+      <div class="flex justify-between items-center bg-gray-900 text-white p-4 rounded-lg shadow-md">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-            Book Management
+          <h1 class="text-xl font-bold flex items-center gap-2">
+            <UIcon name="i-heroicons-wrench-screwdriver" />
+            Inventory Management
           </h1>
-          <p class="text-sm text-gray-500">
-            Direct administrative control over the library inventory.
-          </p>
+          <p class="text-xs text-gray-400">Add, update or remove books from the library system.</p>
         </div>
-
         <UButton
+          color="green"
+          icon="i-heroicons-plus-circle"
           label="Add New Book"
-          icon="i-lucide-plus"
-          color="primary"
-          @click="openAddMode"
+          @click="prepareAdd"
         />
       </div>
 
       <BookDetailPanel
         :book="selectedBook"
-        :mode="currentMode"
+        :mode="panelMode"
         role="admin"
         @save="handleSave"
-        @change-mode="(val) => currentMode = val"
+        @change-mode="(m) => panelMode = m"
       />
 
-      <UAlert
-        v-if="error"
-        icon="i-lucide-circle-alert"
-        color="error"
-        variant="soft"
-        title="Fetch Error"
-        :description="error.message || 'Failed to load books from server.'"
-      />
+      <UCard class="border-2 border-primary/10 shadow-sm">
+        <template #header>
+          <div class="flex justify-between items-center px-4 py-2">
+            <h2 class="text-lg font-bold text-gray-700">Database Records</h2>
+            <div class="flex gap-4">
+              <UInput
+                v-model="quickSearch"
+                icon="i-heroicons-magnifying-glass"
+                placeholder="Search by title or author..."
+                class="w-80"
+              />
+            </div>
+          </div>
+        </template>
 
-      <UCard
-        v-else
-        class="mb-8 border-2 border-primary/20 shadow-lg"
-        :ui="{ body: 'p-6' }"
-      >
-        <div
-          v-if="status === 'pending'"
-          class="py-10 text-center"
-        >
-          <UIcon
-            name="i-lucide-loader-2"
-            class="animate-spin w-8 h-8 mx-auto text-primary"
-          />
-        </div>
-
-        <BookTable
-          v-else
-          :data="books || []"
+        <BookTable 
+          :data="filteredBooks" 
+          :loading="status === 'pending'" 
           role="admin"
           @view="handleView"
-          @edit="handleEdit"
           @delete="handleDelete"
         />
       </UCard>
     </div>
-  </ClientOnly>
+  </UContainer>
 </template>
 
 <script setup lang="ts">
 /**
- * 图书馆项目 (Library Project) - Admin Book Management
- * Fix: Reverted to useApi for stability while keeping ClientOnly for safety.
+ * 图书馆项目 - Admin Books Management (Jules Standard v2.6)
+ * 采用“顶部详情/编辑面板 + 底部数据表”的高效布局
  */
-import type { Book } from '~/types/book'
+import { type Book, createEmptyBook } from '~/types/book'
 
 definePageMeta({
-  layout: 'admin'
+  layout: 'admin',
+  middleware: 'auth'
 })
 
-/* 1. Page State */
-const currentMode = ref<'view' | 'edit' | 'add'>('view')
-const selectedBook = ref<Book>({} as Book)
+// --- 状态与配置 ---
+const selectedBook = ref<Book>(createEmptyBook())
+const panelMode = ref<'view' | 'edit' | 'add'>('view')
+const quickSearch = ref('')
 
-/* 2. Data Fetching (使用你之前最稳妥的 useApi) */
-const { data: books, refresh, status, error } = await useApi<Book[]>('/api/books')
+// --- 1. 数据获取 ---
+const { data: books, status, refresh } = await useApi<Book[]>('/books')
 
-/* 3. Helper: Smooth Scroll */
-const scrollToTop = () => {
-  if (import.meta.client) {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+// --- 2. 交互逻辑 ---
+
+// 准备新增书籍
+const prepareAdd = () => {
+  selectedBook.value = createEmptyBook()
+  panelMode.value = 'add'
+  if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-/* 4. Action Handlers */
+// 查看/编辑书籍详情
 const handleView = (book: Book) => {
   selectedBook.value = { ...book }
-  currentMode.value = 'view'
-  scrollToTop()
+  panelMode.value = 'view'
+  if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-const handleEdit = (book: Book) => {
-  selectedBook.value = { ...book }
-  currentMode.value = 'edit'
-  scrollToTop()
-}
+// 保存逻辑 (新增或更新)
+const handleSave = async (bookData: Book) => {
+  const isNew = panelMode.value === 'add'
+  const url = isNew ? '/books' : `/books/${bookData.id}`
+  const method = isNew ? 'POST' : 'PUT'
 
-const openAddMode = () => {
-  selectedBook.value = {
-    title: '',
-    author: '',
-    isbn: '',
-    bookGenre: 'FICTION',
-    rating: 0,
-    availableStock: 1,
-    description: '',
-    coverImageUrl: ''
-  } as Book
-  currentMode.value = 'add'
-  scrollToTop()
-}
-
-const handleSave = async (updatedBook: Book) => {
-  const token = useCookie('auth_token').value
   try {
-    const isEdit = !!updatedBook.id
-    const url = isEdit ? `/api/books/${updatedBook.id}` : `/api/books`
-
-    await $fetch(url, {
-      method: isEdit ? 'PUT' : 'POST',
-      body: updatedBook,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+    // English Comment: Call API with token from useApi/fetch
+    await $fetch(`/api${url}`, {
+      method,
+      body: bookData,
+      headers: { Authorization: `Bearer ${useCookie('auth_token').value}` }
     })
 
-    await refresh()
-    currentMode.value = 'view'
-    if (isEdit) selectedBook.value = { ...updatedBook }
-  } catch (err) {
-    console.error('Save operation failed:', err)
+    alert(isNew ? 'New book created!' : 'Book updated successfully!')
+    panelMode.value = 'view'
+    await refresh() // 刷新列表
+  } catch (err: any) {
+    alert(err.data?.message || 'Failed to save changes.')
   }
 }
 
+// 删除逻辑
 const handleDelete = async (book: Book) => {
-  const token = useCookie('auth_token').value
   if (!confirm(`Are you sure you want to delete "${book.title}"?`)) return
+
   try {
     await $fetch(`/api/books/${book.id}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${useCookie('auth_token').value}` }
     })
+    alert('Book deleted.')
     if (selectedBook.value.id === book.id) {
-      selectedBook.value = {} as Book
+      selectedBook.value = createEmptyBook()
     }
     await refresh()
-  } catch (err) {
-    console.error('Delete operation failed:', err)
+  } catch (err: any) {
+    alert('Failed to delete book.')
   }
 }
+
+// 搜索过滤
+const filteredBooks = computed(() => {
+  const list = (unref(books) || []) as Book[]
+  if (!quickSearch.value) return list
+  return list.filter(b => 
+    b.title.toLowerCase().includes(quickSearch.value.toLowerCase()) ||
+    b.author.toLowerCase().includes(quickSearch.value.toLowerCase())
+  )
+})
 </script>

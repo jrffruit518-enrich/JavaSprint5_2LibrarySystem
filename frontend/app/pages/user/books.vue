@@ -3,44 +3,34 @@
     <div class="space-y-6">
       <div class="flex justify-between items-center bg-primary/5 p-4 rounded-lg border border-primary/20">
         <div>
-          <h1 class="text-xl font-bold text-highlighted">
-            Library Catalog
-          </h1>
-          <p class="text-sm text-muted">
-            Browse books and manage your personal collection.
-          </p>
+          <h1 class="text-xl font-bold text-green-500">Library Catalog</h1>
+          <p class="text-sm text-gray-500">Select a book to view details and manage your collection.</p>
         </div>
         <UBadge
+          v-if="userStatus"
           variant="subtle"
-          color="primary"
+          :color="userStatus.canBorrow ? 'primary' : 'orange'"
           size="lg"
           class="px-4 py-2"
         >
-          Borrowing Quota: {{ borrowedCount }} / 10 Books
+          <UIcon name="i-heroicons-bookmark" class="mr-1" />
+          Borrowing Quota: {{ userStatus.borrowCount ?? 0 }} / 10 Books
         </UBadge>
       </div>
 
-      <div
-        v-if="selectedBook && selectedBook.id"
-        class="animate-in fade-in slide-in-from-top-4 duration-300"
-      >
-        <BookDetailPanel
-          :book="selectedBook"
-          mode="view"
-          role="user"
-          @close="selectedBook = {}"
-          @action="handleBorrow"
-        />
-      </div>
+      <BookDetailPanel
+        :book="selectedBook"
+        :mode="panelMode"
+        role="user"
+        @borrow="handleBorrow"
+      />
 
       <div class="grid grid-cols-12 gap-6">
         <aside class="col-span-12 md:col-span-3 space-y-6">
           <UCard class="border-2 border-primary/10 shadow-sm">
             <div class="space-y-4">
-              <h3 class="font-bold text-lg border-b pb-2 italic text-primary text-center">
-                Refine Search
-              </h3>
-
+              <h3 class="font-bold text-lg border-b pb-2 italic text-primary text-center">Refine Search</h3>
+              
               <div class="space-y-2">
                 <span class="text-xs font-semibold uppercase text-gray-400">Category</span>
                 <USelect
@@ -54,7 +44,7 @@
                 <UInput
                   v-model="filter.author"
                   placeholder="Search author..."
-                  icon="i-lucide-user"
+                  icon="i-heroicons-user"
                 />
               </div>
 
@@ -72,9 +62,9 @@
 
               <UButton
                 block
-                variant="subtle"
-                icon="i-lucide-rotate-ccw"
-                color="neutral"
+                variant="soft"
+                icon="i-heroicons-arrow-path"
+                color="gray"
                 @click="resetFilters"
               >
                 Reset Filters
@@ -87,36 +77,22 @@
           <UCard class="border-2 border-primary/10 shadow-sm">
             <template #header>
               <div class="flex justify-between items-center px-4 py-2">
-                <h2 class="text-lg font-bold">
-                  Available Books
-                </h2>
+                <h2 class="text-lg font-bold text-gray-700">Inventory List</h2>
                 <UInput
                   v-model="quickSearch"
-                  icon="i-lucide-search"
+                  icon="i-heroicons-magnifying-glass"
                   placeholder="Quick search title..."
                   class="w-64"
                 />
               </div>
             </template>
 
-            <div
-              v-if="status === 'pending'"
-              class="py-10 text-center"
-            >
-              <UIcon
-                name="i-lucide-loader-2"
-                class="animate-spin w-8 h-8 mx-auto text-primary"
-              />
-            </div>
-
-            <div v-else>
-              <BookTable
-                :data="filteredBooks"
-                role="user"
-                @view="handleView"
-                @borrow="handleBorrow"
-              />
-            </div>
+            <BookTable 
+              :data="filteredBooks" 
+              :loading="status === 'pending'" 
+              role="user"
+              @view="handleView"
+            />
           </UCard>
         </main>
       </div>
@@ -125,78 +101,90 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
-
 /**
- * Library Project - User Books Page
- * Business Rule: Max 10 books per user
+ * 图书馆项目 - User Books Catalog (Jules Standard v2.5 - Fixed Layout)
  */
+import { type Book, createEmptyBook } from '~/types/book'
 
-// Define Layout and Auth
 definePageMeta({
   layout: 'user',
   middleware: 'auth'
 })
 
-/* 1. State Management */
-const selectedBook = ref<any>({})
+// --- 状态控制 ---
+const selectedBook = ref<Book>(createEmptyBook()) // 初始状态为空书，Panel 会显示提示
+const panelMode = ref<'view' | 'edit' | 'add'>('view')
 const quickSearch = ref('')
-const filter = reactive({
-  category: 'All',
-  author: '',
-  minRating: 0
-})
+const filter = reactive({ category: 'All', author: '', minRating: 0 })
 
-/* 2. Data Fetching */
-const { data: books, status, refresh } = await useApi<any[]>('/api/books')
+// 获取用户 Cookie
+const userCookie = useCookie<any>('user-data')
+const userId = computed(() => userCookie.value?.id)
 
-/* 3. Computed Properties */
-const filteredBooks = computed(() => {
-  if (!books.value) return []
-  return books.value.filter((book) => {
-    // Aligned with backend field: bookGenre
-    const matchCategory = filter.category === 'All' || book.bookGenre === filter.category
-    const matchAuthor = (book.author || '').toLowerCase().includes(filter.author.toLowerCase())
-    const matchRating = (book.rating || 0) >= filter.minRating
-    const matchSearch = (book.title || '').toLowerCase().includes(quickSearch.value.toLowerCase())
-    return matchCategory && matchAuthor && matchRating && matchSearch
-  })
-})
+// --- 1. 数据获取 ---
 
-const borrowedCount = computed(() => {
-  // English Comment: Calculate borrowed books based on status
-  return books.value?.filter(b => b.status === 'BORROWED').length || 0
-})
+// 获取图书列表
+const { data: books, status, refresh: refreshBooks } = await useApi<Book[]>('/books')
 
-/* 4. Action Handlers */
-const handleView = (book: any) => {
+// 获取借阅状态 (Jules Fix: 使用匿名函数传递动态路径以修复 TS 类型报错)
+const { data: userStatus, refresh: refreshStatus } = await useApi<any>(
+  () => userId.value ? `/borrowings/${userId.value}/status` : null
+)
+
+// --- 2. 交互逻辑 ---
+
+// 当点击表格中的“眼睛”图标或查看按钮时
+const handleView = (book: Book) => {
   selectedBook.value = { ...book }
-  // Scroll to detail panel at the top
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+  panelMode.value = 'view'
+  
+  // 滚动回顶部，让用户立即看到选中的书籍大封面和详情
+  if (import.meta.client) {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 }
 
-const handleBorrow = async (book: any) => {
-  // English Comment: Check quota before sending request
-  if (borrowedCount.value >= 10) {
-    alert('Borrowing limit reached (Max 10 books).')
+// 处理借阅动作
+const handleBorrow = async (book: Book) => {
+  if (userStatus.value && !userStatus.value.canBorrow) {
+    const reason = userStatus.value.hasOverdue 
+      ? 'Please return overdue books first!' 
+      : 'You have reached the maximum borrow limit.'
+    alert(reason)
     return
   }
 
   try {
-    await useApi(`/api/books/${book.id}/borrow`, { method: 'POST' })
-    alert(`Successfully borrowed "${book.title}"!`)
-    selectedBook.value = {}
-    await refresh()
+    await $fetch(`/api/borrowings/borrow/${book.id}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${useCookie('auth_token').value}` }
+    })
+
+    alert(`Successfully borrowed: ${book.title}`)
+    
+    // 串行同步刷新：更新图书库存和用户借阅配额
+    await Promise.all([
+      refreshBooks(),
+      refreshStatus()
+    ])
   } catch (err: any) {
-    console.error('Borrow operation failed:', err)
-    alert(err.data?.message || 'Failed to borrow. Stock might be empty.')
+    alert(err.data?.message || 'Failed to process borrowing request.')
   }
 }
 
+// 筛选逻辑
+const filteredBooks = computed(() => {
+  const list = (unref(books) || []) as Book[]
+  return list.filter((b) => {
+    const matchCat = filter.category === 'All' || b.bookGenre === filter.category
+    const matchAuth = (b.author || '').toLowerCase().includes(filter.author.toLowerCase())
+    const matchRate = (b.rating || 0) >= filter.minRating
+    const matchSearch = (b.title || '').toLowerCase().includes(quickSearch.value.toLowerCase())
+    return matchCat && matchAuth && matchRate && matchSearch
+  })
+})
+
 const resetFilters = () => {
-  filter.category = 'All'
-  filter.author = ''
-  filter.minRating = 0
-  quickSearch.value = ''
+  filter.category = 'All'; filter.author = ''; filter.minRating = 0; quickSearch.value = ''
 }
 </script>

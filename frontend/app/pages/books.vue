@@ -1,57 +1,52 @@
-发现问题了！是因为在 handleBorrow 的 catch 块结束后，缺少了一个闭合的大括号 }，导致后面的 resetFilters 函数嵌套出错，从而引发了语法错误。
-
-我已经修复了括号嵌套问题，并确保代码结构完整。
-
-📄 完整修复后的 pages/user/books.vue
-代码段
 <template>
   <UContainer class="py-6">
     <div class="space-y-6">
-      <div
-        v-if="selectedBook.id"
-        class="animate-in fade-in slide-in-from-top-4 duration-300"
-      >
-        <BookDetailPanel
-          :book="selectedBook"
-          mode="view"
-          role="user"
-          @borrow="handleBorrow"
+      <div class="flex justify-between items-center bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm">
+        <div>
+          <h1 class="text-xl font-bold text-primary">Public Library Catalog</h1>
+          <p class="text-sm text-gray-500">Explore our collection. Please sign in to borrow books.</p>
+        </div>
+        <UButton
+          to="/login"
+          icon="i-heroicons-arrow-right-on-rectangle"
+          label="Sign In to Borrow"
+          color="primary"
+          variant="solid"
         />
       </div>
 
+      <BookDetailPanel
+        :book="selectedBook"
+        mode="view"
+        role="guest"
+      />
+
       <div class="grid grid-cols-12 gap-6">
         <aside class="col-span-12 md:col-span-3 space-y-6">
-          <UCard
-            class="border-2 border-primary/10 shadow-sm"
-            :ui="{ body: 'p-6' }"
-          >
+          <UCard class="border-2 border-primary/5 shadow-sm">
             <div class="space-y-4">
               <h3 class="font-bold text-lg border-b pb-2 italic text-primary text-center">
-                Refine Search
+                Search Filters
               </h3>
 
               <div class="space-y-2">
                 <span class="text-xs font-semibold uppercase text-gray-400">Category</span>
                 <USelect
                   v-model="filter.category"
-                  :items="['All', 'FICTION', 'NON_FICTION', 'SCIENCE', 'HISTORY', 'ART', 'FANTASY']"
+                  :options="['All', 'FICTION', 'NON_FICTION', 'SCIENCE', 'HISTORY', 'ART', 'FANTASY']"
                 />
               </div>
 
               <div class="space-y-2">
                 <span class="text-xs font-semibold uppercase text-gray-400">Author</span>
-                <UInput
-                  v-model="filter.author"
-                  placeholder="Search author..."
-                  icon="i-lucide-user"
-                />
+                <UInput v-model="filter.author" placeholder="Search author..." icon="i-heroicons-user" />
               </div>
 
               <div class="space-y-2">
                 <span class="text-xs font-semibold uppercase text-gray-400">Min Rating</span>
                 <USelect
                   v-model.number="filter.minRating"
-                  :items="[
+                  :options="[
                     { label: 'Any Rating', value: 0 },
                     { label: '4.0+ Stars', value: 4 },
                     { label: '4.5+ Stars', value: 4.5 }
@@ -61,9 +56,9 @@
 
               <UButton
                 block
-                variant="subtle"
-                icon="i-lucide-rotate-ccw"
-                color="neutral"
+                variant="ghost"
+                icon="i-heroicons-arrow-path"
+                color="gray"
                 @click="resetFilters"
               >
                 Reset Filters
@@ -73,40 +68,25 @@
         </aside>
 
         <main class="col-span-12 md:col-span-9">
-          <UCard
-            class="border-2 border-primary/10 shadow-sm"
-            :ui="{ body: 'p-6' }"
-          >
+          <UCard class="border-2 border-primary/5 shadow-sm">
             <template #header>
               <div class="flex justify-between items-center px-4 py-2">
-                <h2 class="text-xl font-bold">
-                  Library Catalog
-                </h2>
-                <UInput
-                  v-model="quickSearch"
-                  icon="i-lucide-search"
-                  placeholder="Quick search title..."
+                <h2 class="text-lg font-bold text-gray-700">Available Inventory</h2>
+                <UInput 
+                  v-model="quickSearch" 
+                  icon="i-heroicons-magnifying-glass" 
+                  placeholder="Filter by title..." 
+                  class="w-64"
                 />
               </div>
             </template>
 
-            <div
-              v-if="status === 'pending'"
-              class="py-10 text-center"
-            >
-              <UIcon
-                name="i-lucide-loader-2"
-                class="animate-spin w-8 h-8 mx-auto text-primary"
-              />
-            </div>
-
-            <div v-else>
-              <BookTable
-                :data="filteredBooks"
-                role="guest"
-                @view="handleView"
-              />
-            </div>
+            <BookTable 
+              :data="filteredBooks" 
+              :loading="status === 'pending'" 
+              role="user"
+              @view="handleView"
+            />
           </UCard>
         </main>
       </div>
@@ -116,26 +96,33 @@
 
 <script setup lang="ts">
 /**
- * 图书馆项目 (Library Project) - User Catalog & Borrowing
+ * 图书馆项目 - Guest Books Catalog (Public View)
+ * Jules v2.6 - Large Panel Edition
  */
-import type { Book } from '~/types/book'
+import { type Book, createEmptyBook } from '~/types/book'
 
-/* 1. State Management */
-const selectedBook = ref<Book>({} as Book)
+// 1. 数据请求 - 访客无需鉴权，直接获取
+const { data: books, status } = await useApi<Book[]>('/books')
+
+// 2. 状态管理
+const selectedBook = ref<Book>(createEmptyBook())
 const quickSearch = ref('')
-const filter = reactive({
-  category: 'All',
-  author: '',
-  minRating: 0
-})
+const filter = reactive({ category: 'All', author: '', minRating: 0 })
 
-/* 2. Data Fetching */
-const { data: books, status, refresh } = await useApi<Book[]>('/api/books')
+// 3. 核心交互：点击查看
+const handleView = (book: Book) => {
+  selectedBook.value = { ...book }
+  
+  // English Comment: Scroll to top to focus on the detail panel with the cover
+  if (import.meta.client) {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
 
-/* 3. Computed: Filtering Logic */
+// 4. 筛选逻辑
 const filteredBooks = computed(() => {
-  if (!books.value) return []
-  return books.value.filter((book: Book) => {
+  const list = (unref(books) || []) as Book[]
+  return list.filter((book: Book) => {
     const matchCategory = filter.category === 'All' || book.bookGenre === filter.category
     const matchAuthor = (book.author || '').toLowerCase().includes(filter.author.toLowerCase())
     const matchRating = (book.rating || 0) >= filter.minRating
@@ -144,46 +131,7 @@ const filteredBooks = computed(() => {
   })
 })
 
-/* 4. Action Handlers */
-const handleView = (book: Book) => {
-  selectedBook.value = { ...book }
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-const handleBorrow = async (book: Book) => {
-  const token = useCookie('auth_token').value
-  // English Comment: Borrowing requires valid user session/token
-  if (!token) {
-    alert('Please login first to borrow books.')
-    return
-  }
-
-  try {
-    // English Comment: Send borrowing request to Spring Boot backend
-    await $fetch(`/api/books/${book.id}/borrow`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
-    })
-
-    alert(`Successfully borrowed "${book.title}"!`)
-    await refresh() // Refresh to update stock count
-    selectedBook.value = {} as Book // Close panel
-  } catch (err: unknown) {
-    // English Comment: Cast error to any to access response data properties
-    const fetchError = err as any
-    console.error('Borrow failed:', fetchError)
-    alert(fetchError.data?.message || 'Failed to borrow the book. It might be out of stock.')
-  }
-} // 👈 这个闭合括号之前漏掉了
-
 const resetFilters = () => {
-  filter.category = 'All'
-  filter.author = ''
-  filter.minRating = 0
-  quickSearch.value = ''
+  filter.category = 'All'; filter.author = ''; filter.minRating = 0; quickSearch.value = '';
 }
-
-definePageMeta({
-  layout: 'default'
-})
 </script>

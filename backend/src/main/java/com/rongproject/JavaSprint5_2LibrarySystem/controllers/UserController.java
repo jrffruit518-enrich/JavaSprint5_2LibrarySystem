@@ -75,11 +75,17 @@ public class UserController {
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Admin: Toggle user active status")
-    public ResponseEntity<UserResponse> toggleStatus(@PathVariable Long id, @RequestBody boolean enabled) {
-        // English Comment: Pass the 'ADMIN' role to unlock status change branch in service
-        User data = new User();
-        data.setEnabled(enabled);
-        return ResponseEntity.ok(userService.updateUser(id, data, "ADMIN"));
+    public ResponseEntity<UserResponse> toggleStatus(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, Boolean> payload) {
+
+        // 技巧：从 Map 中获取 enabled，比直接传 boolean 更符合 JSON 规范
+        Boolean enabled = payload.get("enabled");
+        if (enabled == null) {
+            throw new IllegalArgumentException("Field 'enabled' is required");
+        }
+
+        return ResponseEntity.ok(userService.toggleUserStatus(id, enabled));
     }
 
     // --- 3. 用户自查与信息更新 ---
@@ -91,7 +97,7 @@ public class UserController {
         return ResponseEntity.ok(userService.getUserById(id));
     }
 
-    @PutMapping("/me")
+    @PutMapping("/profile")
     @Operation(summary = "User: Update own profile")
     public ResponseEntity<UserResponse> updateSelf(
             @RequestBody @Valid UserProfileRequest request,
@@ -99,7 +105,7 @@ public class UserController {
 
         // English Comment: Get ID directly from the principal object to avoid static utility issues in tests
         Long currentUserId = userDetails.getId();
-        return ResponseEntity.ok(userService.updateUser(currentUserId, request.toEntity(), "USER"));
+        return ResponseEntity.ok(userService.updateUser(currentUserId, request,"USER"));
     }
 
     // Java - UserController.java

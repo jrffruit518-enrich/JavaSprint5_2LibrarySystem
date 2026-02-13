@@ -1,90 +1,47 @@
-import type { UseFetchOptions } from 'nuxt/app'
-
 /**
- * app/composables/useApi.ts
- * A type-safe fetch wrapper for the Library Project.
- * Updated by Jules: Guaranteed token injection and enhanced error diagnostics.
+ * 图书馆项目 - 统一 API 请求 Composable (Nuxt 4 适配版)
+ * 功能：自动注入 JWT Token, 错误日志拦截, 响应式参数监听
  */
-
-/* Define the structure of the backend error response */
-interface ApiError {
-  message: string
-  status?: number
-}
-
-/* Define the User Profile interface matching the Backend Record DTO */
-export interface UserProfileDTO {
-  id: number
-  username: string
-  email: string
-  userRole: 'MEMBER' | 'ADMIN'
-  avatarUrl: string
-}
-
-export const useApi = <T>(url: string, options: UseFetchOptions<T> = {}) => {
-  /**
-   * 1. Token Retrieval:
-   * Ensure index.vue uses 'auth_token' for consistency.
-   */
+export const useApi = <T>(
+  url: string | (() => string | null),
+  options: any = {}
+) => {
   const token = useCookie<string | null>('auth_token')
-
-  /**
-   * 2. Runtime Configuration
-   */
   const config = useRuntimeConfig()
 
-  /**
-   * 3. Header Merging Strategy
-   * We clone existing headers and inject the Authorization bearer token.
-   */
-  const customHeaders: Record<string, string> = {
-    ...((options.headers as Record<string, string>) || {})
-  }
+  // 1. 确定缓存 Key：如果是函数，使用其返回值作为动态 Key 的一部分
+  const key = typeof url === 'string' ? url : `dynamic-${url.toString().length}`
 
-  if (token.value) {
-    customHeaders['Authorization'] = `Bearer ${token.value}`
-  }
+  return useAsyncData<T>(
+    key,
+    async () => {
+      const targetUrl = typeof url === 'function' ? url() : url
+      if (!targetUrl) return null as any
 
-  // Jules: Return useFetch with standardized configuration
-  return useFetch(url, {
-    /**
-     * Use dynamic baseURL from runtimeConfig.
-     */
-    baseURL: config.public.apiBase,
-
-    /* Merge original options */
-    ...options,
-
-    /* Explicitly override headers with our token-injected object */
-    headers: customHeaders,
-
-    /* Response error handling and diagnostics */
-    onResponseError({ response }) {
-      const status = response.status
-      const errorData = response._data as unknown as ApiError
-      const errorMsg = errorData?.message || 'Access Denied'
-
-      if (status === 401 || status === 403) {
-        console.error(`>>> [JULES AUTH ERROR ${status}]:`, errorMsg)
-        console.dir(response._data) // Print full body for deep debugging
-
-        // Standardize redirect to login on auth failure (Client-side only)
-        if (import.meta.client) {
-          // Optional: Only redirect on 401 (Unauthorized)
-          // navigateTo('/')
-        }
-      } else {
-        console.error(`>>> [JULES API ERROR ${status}]:`, errorMsg)
+      const headers: Record<string, string> = {
+        ...((options.headers as Record<string, string>) ?? {})
       }
-    }
-  } as UseFetchOptions<T>)
-}
 
-/**
- * 4. Helper function to fetch the current user's profile.
- */
-export const useUserProfile = () => {
-  return useApi<UserProfileDTO>('/api/users/profile', {
-    method: 'GET'
-  })
+      // 2. 自动注入 JWT Token
+      if (token.value) {
+        headers.Authorization = `Bearer ${token.value}`
+      }
+
+      // 3. 执行核心 $fetch
+      return $fetch<T>(targetUrl, {
+        baseURL: config.public.apiBase || '/api',
+        ...options,
+        headers,
+        // 错误处理：可在此扩展 401 自动跳转登录逻辑
+        onResponseError({ response }) {
+          console.error(`[API ERROR ${response.status}]`, response._data?.message || 'Request Failed')
+        }
+      })
+    },
+    {
+      server: true,
+      // 4. 核心优化：如果是函数式 URL，自动将其加入 watch，URL 变了就自动 fetch
+      watch: typeof url === 'function' ? [url] : []
+    }
+  )
 }

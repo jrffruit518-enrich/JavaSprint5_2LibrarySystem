@@ -1,93 +1,87 @@
-你的 BookTable.vue 代码逻辑和事件触发是非常标准的，不需要为了功能实现做核心逻辑修改。它已经正确地通过 @click="$emit('view', book)" 把整个书籍对象传给父组件了。
-
-但是，为了让它在 Nuxt 4 / TypeScript 环境下更健壮，并彻底消除潜在的类型警告，我建议对 defineEmits 进行显式类型定义。这样父组件在接收 book 时，IDE 就能自动识别它是 Book 类型，而不是 any。
-
-这是为你优化后的 完整版本：
-
-代码段
 <template>
-  <div class="overflow-x-auto border border-default rounded-lg">
-    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
-      <thead class="bg-gray-50 dark:bg-gray-900">
-        <tr>
-          <th
-            v-for="col in tableColumns"
-            :key="col.key"
-            class="px-4 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider"
+  <div class="border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden flex flex-col">
+    <div class="overflow-y-auto max-h-[500px] relative">
+      <UTable
+        :rows="data"
+        :columns="tableColumns"
+        :loading="loading"
+        :ui="{ 
+          wrapper: 'relative',
+          thead: 'bg-gray-50 dark:bg-gray-900 sticky top-0 z-10 shadow-sm',
+          th: { base: 'text-xs font-semibold text-gray-500 uppercase tracking-wider' },
+          td: { base: 'text-sm text-gray-600 dark:text-gray-400' }
+        }"
+      >
+        <template #title-data="{ row }">
+          <span class="font-medium text-gray-900 dark:text-white truncate max-w-[200px] block">
+            {{ row.title }}
+          </span>
+        </template>
+
+        <template #bookGenre-data="{ row }">
+          <UBadge
+            size="xs"
+            variant="soft"
+            :color="getGenreColor(row.bookGenre)"
           >
-            {{ col.label }}
-          </th>
-        </tr>
-      </thead>
-      <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-100 dark:divide-gray-800">
-        <tr
-          v-for="book in data"
-          :key="book.id"
-          class="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-        >
-          <td class="px-4 py-3 text-sm font-medium text-highlighted max-w-xs truncate">
-            {{ book.title }}
-          </td>
+            {{ row.bookGenre }}
+          </UBadge>
+        </template>
 
-          <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-            {{ book.author }}
-          </td>
+        <template #stock-data="{ row }">
+          <span :class="row.availableStock <= 5 ? 'text-red-500 font-bold' : ''">
+            {{ row.availableStock }}
+          </span>
+        </template>
 
-          <td class="px-4 py-3 text-sm">
-            <UBadge
+        <template #rating-data="{ row }">
+          <div class="flex items-center gap-1">
+            <span class="text-orange-400">★</span>
+            <span>{{ row.rating }}</span>
+          </div>
+        </template>
+
+        <template #actions-data="{ row }">
+          <div class="flex items-center gap-1">
+            <UButton
+              icon="i-heroicons-eye"
               size="xs"
-              variant="soft"
-              color="primary"
-            >
-              {{ book.bookGenre }}
-            </UBadge>
-          </td>
+              variant="ghost"
+              color="gray"
+              @click="$emit('view', row)"
+            />
 
-          <td class="px-4 py-3 text-sm text-center">
-            {{ book.availableStock }}
-          </td>
-
-          <td class="px-4 py-3 text-sm">
-            <span class="text-orange-400">★</span> {{ book.rating }}
-          </td>
-
-          <td class="px-4 py-3 text-sm">
-            <div class="flex items-center gap-1">
+            <template v-if="role === 'admin'">
               <UButton
-                icon="i-lucide-eye"
+                icon="i-heroicons-pencil-square"
                 size="xs"
                 variant="ghost"
-                color="neutral"
-                @click="$emit('view', book)"
+                color="primary"
+                @click="$emit('view', row)" 
               />
-
-              <template v-if="role === 'admin'">
-                <UButton
-                  icon="i-lucide-edit"
-                  size="xs"
-                  variant="ghost"
-                  color="primary"
-                  @click="$emit('edit', book)"
-                />
-                <UButton
-                  icon="i-lucide-trash"
-                  size="xs"
-                  variant="ghost"
-                  color="error"
-                  @click="$emit('delete', book)"
-                />
-              </template>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+              <UButton
+                icon="i-heroicons-trash"
+                size="xs"
+                variant="ghost"
+                color="red"
+                @click="$emit('delete', row)"
+              />
+            </template>
+          </div>
+        </template>
+      </UTable>
+    </div>
+    
+    <div class="p-2 px-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 text-xs text-gray-500">
+      Showing {{ data?.length || 0 }} entries
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * 图书馆项目 (Library Project) - BookTable
+ * Jules Component Sync: BookTable (Fixed Viewport Edition)
+ * 修复了长列表导致的页面溢出问题。
  */
 import type { Book } from '~/types/book'
 
@@ -97,19 +91,29 @@ const props = defineProps<{
   role: 'admin' | 'guest' | 'user'
 }>()
 
-// English Comment: Explicitly define emit types for better IDE support and type safety
 defineEmits<{
   view: [book: Book]
-  edit: [book: Book]
   delete: [book: Book]
 }>()
 
+// 表格列配置
 const tableColumns = [
   { key: 'title', label: 'Title' },
   { key: 'author', label: 'Author' },
   { key: 'bookGenre', label: 'Genre' },
-  { key: 'stock', label: 'Stock' },
+  { key: 'stock', label: 'Stock' }, 
   { key: 'rating', label: 'Rating' },
   { key: 'actions', label: 'Actions' }
 ]
+
+const getGenreColor = (genre: string) => {
+  const map: Record<string, string> = {
+    'FICTION': 'blue',
+    'NON_FICTION': 'green',
+    'SCIENCE': 'purple',
+    'FANTASY': 'orange',
+    'HISTORY': 'yellow'
+  }
+  return map[genre] || 'gray'
+}
 </script>

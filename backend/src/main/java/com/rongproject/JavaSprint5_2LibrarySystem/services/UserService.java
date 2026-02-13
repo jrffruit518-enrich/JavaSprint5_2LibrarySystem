@@ -2,6 +2,7 @@ package com.rongproject.JavaSprint5_2LibrarySystem.services;
 
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.AdminRegisterRequest;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserProfileDTO;
+import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserProfileRequest;
 import com.rongproject.JavaSprint5_2LibrarySystem.DTO.UserResponse;
 import com.rongproject.JavaSprint5_2LibrarySystem.entities.User;
 import com.rongproject.JavaSprint5_2LibrarySystem.enums.LogStatus;
@@ -18,6 +19,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -60,78 +62,45 @@ public class UserService {
         return mapToResponse(user);
     }
 
-    public UserResponse updateUser(Long targetUserId, User updatedData, String operatorRole) {
-        // 1. 获取现有用户信息
-        System.out.println("DEBUG: Current User is " + SecurityUtils.getCurrentUsername());
-        User userToUpdate = userRepository.findByIdOrThrow(targetUserId);
-        String currentUsername = SecurityUtils.getCurrentUsername(); // 假设你的工具类
+    @Transactional
+    public UserResponse updateUser(Long targetUserId, UserProfileRequest request, String operatorRole) {
+        // 1. 获取现有用户信息 (existingUser)
+        User userToUpdate = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        // 2. Root Admin 核心保护
+        String currentUsername = SecurityUtils.getCurrentUsername();
+
+        // 2. Root Admin 核心保护 (保持逻辑不变)
         if ("admin".equals(userToUpdate.getUsername())) {
-            // 只有 admin 自己能改自己
             if (!"admin".equals(currentUsername)) {
                 throw new ForbiddenException("Root admin can only be modified by itself");
             }
-            // 即使是 admin 自己，也不允许把自己的名字改掉
-            if (updatedData.getUsername() != null && !"admin".equals(updatedData.getUsername())) {
-                throw new ForbiddenException("Root admin username is permanent");
+        }
+
+        // 3. 唯一性检查 (仅针对 email，因为 UserProfileRequest 通常不改 username)
+        if (request.email() != null && !request.email().equals(userToUpdate.getEmail())) {
+            if (userRepository.existsByEmail(request.email())) {
+                throw new AlreadyExistsException("Email is already in use: " + request.email());
             }
         }
 
-        // 3. 禁止非法占位
-        if (updatedData.getUsername() != null && "admin".equals(updatedData.getUsername())
-                && !"admin".equals(userToUpdate.getUsername())) {
-            throw new ForbiddenException("Username 'admin' is reserved");
-        }
-
-        // 4. 唯一性检查 (仅在字段发生变化且不为空时检查)
-        if (updatedData.getEmail() != null && !updatedData.getEmail().equals(userToUpdate.getEmail())) {
-            if (userRepository.existsByEmail(updatedData.getEmail())) {
-                throw new AlreadyExistsException("Email is already in use: " + updatedData.getEmail());
-            }
-        }
-        if (updatedData.getUsername() != null && !updatedData.getUsername().equals(userToUpdate.getUsername())) {
-            if (userRepository.existsByUsername(updatedData.getUsername())) {
-                throw new AlreadyExistsException("Username is already taken: " + updatedData.getUsername());
-            }
-        }
-
-        // 5. 分权执行修改逻辑
+        // 4. 执行修改逻辑
         if ("ADMIN".equals(operatorRole)) {
-            // --- 管理员特权分支 ---
-
-            // 修复布尔陷阱：只有状态不一致时才切换，避免默认值 false 误伤
-            if (updatedData.isEnabled() != userToUpdate.isEnabled()) {
-                userToUpdate.setEnabled(updatedData.isEnabled());
-                userToUpdate.setManualLock(!updatedData.isEnabled());
-            }
-
-            // 修复 Null 覆盖风险：只有传入非空值才修改
-            if (updatedData.getUsername() != null) {
-                userToUpdate.setUsername(updatedData.getUsername());
-            }
-            if (updatedData.getEmail() != null) {
-                userToUpdate.setEmail(updatedData.getEmail());
-            }
-            if (updatedData.getUserRole() != null) {
-                userToUpdate.setUserRole(updatedData.getUserRole());
-            }
-        }
-        else {
+            // --- 管理员特权分支 (未来如果 Admin 专用 DTO 扩展，在此处理) ---
+            // 目前 UserProfileRequest 仅包含个人资料字段
+            request.updateExistingUser(userToUpdate);
+        } else {
             // --- 普通用户自我修改分支 ---
-            if (updatedData.getEmail() != null) {
-                userToUpdate.setEmail(updatedData.getEmail());
+            // 映射基本字段：email, avatarUrl
+            request.updateExistingUser(userToUpdate);
+
+            // 独立处理密码加密
+            if (request.password() != null && !request.password().isEmpty()) {
+                userToUpdate.setPassword(passwordEncoder.encode(request.password()));
             }
-            if (updatedData.getAvatarUrl() != null) {
-                userToUpdate.setAvatarUrl(updatedData.getAvatarUrl());
-            }
-            if (updatedData.getPassword() != null && !updatedData.getPassword().isEmpty()) {
-                userToUpdate.setPassword(passwordEncoder.encode(updatedData.getPassword()));
-            }
-            // 普通用户路径下，enabled/username/userRole 保持原样，不予处理
         }
 
-        // 6. 持久化并返回
+        // 5. 持久化并返回
         User savedUser = userRepository.save(userToUpdate);
         return mapToResponse(savedUser);
     }
@@ -215,6 +184,24 @@ public class UserService {
     private String generateInternalEmail(String username) {
         // English Comment: Generates a unique internal identifier to satisfy DB constraints
         return String.format("%s@internal.system", username.toLowerCase());
+    }
+
+    @Transactional
+    public UserResponse toggleUserStatus(Long id, boolean enabled) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        // Root Admin 保护：禁止禁用 admin 账号
+        if ("admin".equals(user.getUsername())) {
+            throw new ForbiddenException("Root admin status cannot be changed");
+        }
+
+        // 更新状态：同步修改 enabled 和 manualLock
+        user.setEnabled(enabled);
+        user.setManualLock(!enabled);
+
+        User savedUser = userRepository.save(user);
+        return mapToResponse(savedUser);
     }
 
     private UserResponse mapToResponse(User user) {
