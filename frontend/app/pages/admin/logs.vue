@@ -46,15 +46,25 @@
       <UTable :rows="filteredLogs" :columns="columns" :loading="pending">
         <template #status-data="{ row }">
           <UBadge 
-            :color="row.status === 'BORROWED' ? 'green' : (row.status === 'OVERDUE' ? 'red' : 'gray')" 
+            :color="isOverdue(row) ? 'red' : (row.status === 'BORROWED' ? 'green' : 'gray')" 
             variant="subtle"
+            :class="{ 'animate-pulse': isOverdue(row) }"
           >
-            {{ row.status }}
+            {{ isOverdue(row) ? 'OVERDUE' : row.status }}
           </UBadge>
         </template>
 
         <template #borrowDate-data="{ row }">
-          <span class="text-xs font-mono">{{ formatDate(row.borrowDate) }}</span>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-mono" :class="{ 'text-red-600 font-bold': isOverdue(row) }">
+              {{ formatDate(row.borrowDate) }}
+            </span>
+            <UIcon 
+              v-if="isOverdue(row)" 
+              name="i-heroicons-exclamation-triangle" 
+              class="text-red-500 w-4 h-4 animate-bounce" 
+            />
+          </div>
         </template>
       </UTable>
     </UCard>
@@ -63,7 +73,9 @@
 
 <script setup lang="ts">
 /**
- * Admin Logs Page (Jules v4.5 - Precision Filtering)
+ * Admin Logs Page (Jules v4.7 - Overdue Visualized)
+ * 1. 增加 isOverdue 计算逻辑
+ * 2. 状态列与日期列联动显示红色警告
  */
 definePageMeta({ layout: 'admin', middleware: 'auth' })
 
@@ -82,22 +94,32 @@ const columns = [
 
 const { data: logs, pending, refresh: fetchLogs } = await useApi<any[]>('/borrowings/all-logs')
 
-// 核心：三个维度同时生效的独立过滤
+// --- Overdue 判定逻辑 (14天) ---
+const isOverdue = (log: any) => {
+  if (!log.borrowDate || log.status === 'RETURNED') return false
+  
+  const borrowDate = new Date(log.borrowDate).getTime()
+  const now = new Date().getTime()
+  const diffDays = (now - borrowDate) / (1000 * 60 * 60 * 24)
+  
+  return diffDays > 14
+}
+
 const filteredLogs = computed(() => {
   if (!logs.value) return []
   return logs.value.filter(log => {
-    // 1. 用户名精准/模糊匹配
     const matchUser = !filters.username || 
       log.username?.toLowerCase().includes(filters.username.toLowerCase())
     
-    // 2. 书名精准/模糊匹配
     const matchBook = !filters.bookTitle || 
       log.bookTitle?.toLowerCase().includes(filters.bookTitle.toLowerCase())
     
-    // 3. 状态匹配
-    const matchStatus = filters.status === 'ALL' || log.status === filters.status
+    // 状态过滤逻辑：如果选了 OVERDUE，则显示所有符合 isOverdue 的记录
+    let matchStatus = filters.status === 'ALL' || log.status === filters.status
+    if (filters.status === 'OVERDUE') {
+      matchStatus = isOverdue(log)
+    }
     
-    // 只有当三个条件同时满足时才显示
     return matchUser && matchBook && matchStatus
   })
 })
