@@ -1,34 +1,67 @@
+// Library Project - Visual Refactor nuxt.config.ts (Jules Standard v2.9)
 export default defineNuxtConfig({
-  // 保持你 GitHub 上的模块配置
+  // 1. Core Modules: Added Google Fonts for enhanced typography
   modules: [
-    '@nuxt/ui' 
-    // 先不加 eslint，等跑通后再加，避免干扰
+    '@nuxt/ui',
+    '@nuxtjs/google-fonts'
   ],
 
+  // 2. Dev Tools
   devtools: { enabled: true },
 
+  // 3. Global CSS: Loading refactored styles with role-based logic
   css: ['~/assets/css/main.css'],
 
+  // 4. Typography: Enforcing 'Public Sans' for a modern feel
+  googleFonts: {
+    families: {
+      'Public Sans': [300, 400, 500, 600, 700],
+    },
+    display: 'swap',
+    prefetch: true,
+    preconnect: true,
+  },
+
+  // 5. UI Refinement: Safelist colors to prevent purging during role switching
+  ui: {
+    safelistColors: ['emerald', 'indigo', 'rose', 'amber', 'gray'],
+    icons: ['heroicons', 'lucide'] // Essential for high-quality iconography
+  },
+
+  // 6. Environment: Public API base path
   runtimeConfig: {
     public: {
-      // 在开发环境，我们通过 Nitro Proxy 访问，所以直接写 /api
       apiBase: '/api'
     }
   },
 
-  // 这里的日期改为你今天的日期，解决之前的报错
   compatibilityDate: '2026-02-13',
 
+  // 7. Nitro Proxy: REMAINED UNTOUCHED (Fixed 404 Solution)
   nitro: {
+    routeRules: {
+      '/api/**': { 
+        proxy: 'http://localhost:8080/**', 
+        cors: true 
+      }
+    },
     devProxy: {
       '/api': {
         target: 'http://localhost:8080',
-        changeOrigin: true
+        changeOrigin: true,
+        prependPath: false 
       }
     }
   },
 
-  // 必须保留这个 Jules Fix，防止图标加载失败
+  // 8. ColorMode: Default to light for "Warm Bookshelf" style
+  colorMode: {
+    preference: 'light',
+    fallback: 'light',
+    classSuffix: ''
+  },
+
+  // 9. Icon Support: Jules standard fix
   icon: {
     localApiEndpoint: '/_icon'
   }

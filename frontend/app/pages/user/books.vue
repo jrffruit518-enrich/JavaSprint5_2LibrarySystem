@@ -1,156 +1,131 @@
 <template>
-  <UContainer class="py-6">
-    <div class="space-y-6">
-      <div class="flex justify-between items-center bg-primary/5 p-4 rounded-lg border border-primary/20">
-        <div>
-          <h1 class="text-xl font-bold text-green-500">Library Catalog</h1>
-          <p class="text-sm text-gray-500">Select a book to view details and manage your collection.</p>
+  <div class="w-full space-y-6 animate-spring-in">
+    <div class="flex justify-between items-center bg-slate-900 text-white p-6 rounded-xl shadow-xl border border-slate-800">
+      <div class="flex items-center gap-4">
+        <div class="bg-emerald-500/20 p-3 rounded-lg">
+          <UIcon name="i-heroicons-building-library-solid" class="w-8 h-8 text-emerald-500" />
         </div>
-        <UBadge
-          v-if="userStatus"
-          variant="subtle"
-          :color="userStatus.canBorrow ? 'primary' : 'orange'"
-          size="lg"
-          class="px-4 py-2"
-        >
-          <UIcon name="i-heroicons-bookmark" class="mr-1" />
-          Borrowing Quota: {{ userStatus.borrowCount ?? 0 }} / 10 Books
-        </UBadge>
+        <div>
+          <h1 class="text-2xl font-black leading-tight tracking-tighter uppercase">
+            Library <span class="text-emerald-500">Catalog</span>
+          </h1>
+          <p class="text-sm text-gray-400 font-medium tracking-wide">Explore our collection and manage your readings.</p>
+        </div>
       </div>
+      
+      <div v-if="userStatus" class="flex items-center gap-4 bg-white/5 p-2 px-4 rounded-xl border border-white/10">
+        <div class="text-right">
+          <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Borrowing Limit</p>
+          <p class="font-black text-emerald-400 text-lg leading-none">
+            {{ userStatus.borrowCount ?? 0 }} <span class="text-slate-500 text-xs">/ 10</span>
+          </p>
+        </div>
+        <UIcon name="i-heroicons-bookmark-square-solid" class="w-8 h-8 text-emerald-500/50" />
+      </div>
+    </div>
 
-      <BookDetailPanel
-        :book="selectedBook"
-        :mode="panelMode"
-        role="user"
-        @borrow="handleBorrow"
-      />
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-wrap items-end gap-4">
+      <UFormGroup label="Quick Search" class="flex-1 min-w-[200px]" size="sm">
+        <UInput 
+          v-model="quickSearch" 
+          icon="i-heroicons-magnifying-glass" 
+          placeholder="Search title or author..." 
+          input-class="font-bold"
+        />
+      </UFormGroup>
 
-      <div class="grid grid-cols-12 gap-6">
-        <aside class="col-span-12 md:col-span-3 space-y-6">
-          <UCard class="border-2 border-primary/10 shadow-sm">
-            <div class="space-y-4">
-              <h3 class="font-bold text-lg border-b pb-2 italic text-primary text-center">Refine Search</h3>
-              
-              <div class="space-y-2">
-                <span class="text-xs font-semibold uppercase text-gray-400">Category</span>
-                <USelect
-                  v-model="filter.category"
-                  :options="['All', 'FICTION', 'NON_FICTION', 'SCIENCE', 'HISTORY', 'ART', 'FANTASY']"
-                />
-              </div>
+      <UFormGroup label="Category" size="sm" class="w-48">
+        <USelectMenu 
+          v-model="filter.category" 
+          :options="['All', 'FICTION', 'NON_FICTION', 'TECH', 'HISTORY', 'ART', 'FANTASY']" 
+        />
+      </UFormGroup>
 
-              <div class="space-y-2">
-                <span class="text-xs font-semibold uppercase text-gray-400">Author</span>
-                <UInput
-                  v-model="filter.author"
-                  placeholder="Search author..."
-                  icon="i-heroicons-user"
-                />
-              </div>
+      <UButton 
+        icon="i-heroicons-arrow-path" 
+        color="gray" 
+        variant="soft" 
+        size="sm" 
+        class="mb-[2px] font-bold" 
+        @click="resetFilters"
+      >
+        Reset
+      </UButton>
+    </div>
 
-              <div class="space-y-2">
-                <span class="text-xs font-semibold uppercase text-gray-400">Min Rating</span>
-                <USelect
-                  v-model.number="filter.minRating"
-                  :options="[
-                    { label: 'Any Rating', value: 0 },
-                    { label: '4.0+ Stars', value: 4 },
-                    { label: '4.5+ Stars', value: 4.5 }
-                  ]"
-                />
-              </div>
-
-              <UButton
-                block
-                variant="soft"
-                icon="i-heroicons-arrow-path"
-                color="gray"
-                @click="resetFilters"
-              >
-                Reset Filters
-              </UButton>
-            </div>
-          </UCard>
-        </aside>
-
-        <main class="col-span-12 md:col-span-9">
-          <UCard class="border-2 border-primary/10 shadow-sm">
-            <template #header>
-              <div class="flex justify-between items-center px-4 py-2">
-                <h2 class="text-lg font-bold text-gray-700">Inventory List</h2>
-                <UInput
-                  v-model="quickSearch"
-                  icon="i-heroicons-magnifying-glass"
-                  placeholder="Quick search title..."
-                  class="w-64"
-                />
-              </div>
-            </template>
-
+    <div class="grid grid-cols-12 gap-6 items-start">
+      
+      <main class="col-span-12 lg:col-span-9">
+        <UCard class="border-none shadow-xl ring-1 ring-gray-200 dark:ring-gray-700 overflow-hidden" :ui="{ body: { padding: 'p-0' } }">
+          <div class="h-[calc(100vh-420px)] overflow-hidden">
             <BookTable 
               :data="filteredBooks" 
               :loading="status === 'pending'" 
               role="user"
+              :selected-id="selectedBook.id"
               @view="handleView"
             />
-          </UCard>
-        </main>
-      </div>
+          </div>
+        </UCard>
+      </main>
+
+      <aside class="col-span-12 lg:col-span-3 sticky top-6">
+        <div class="h-[calc(100vh-160px)] side-panel-deep-text">
+          <BookDetailPanel
+            :book="selectedBook"
+            :mode="panelMode"
+            role="user"
+            @borrow="handleBorrow"
+            @close="resetSelection"
+          />
+        </div>
+      </aside>
+
     </div>
-  </UContainer>
+  </div>
 </template>
 
 <script setup lang="ts">
-/**
- * 图书馆项目 - User Books Catalog (Jules Standard v2.5 - Fixed Layout)
- */
 import { type Book, createEmptyBook } from '~/types/book'
+const toast = useToast()
 
-definePageMeta({
-  layout: 'user',
-  middleware: 'auth'
-})
+definePageMeta({ layout: 'user', middleware: 'auth' })
 
-// --- 状态控制 ---
-const selectedBook = ref<Book>(createEmptyBook()) // 初始状态为空书，Panel 会显示提示
+const selectedBook = ref<Book>(createEmptyBook())
 const panelMode = ref<'view' | 'edit' | 'add'>('view')
 const quickSearch = ref('')
-const filter = reactive({ category: 'All', author: '', minRating: 0 })
+const filter = reactive({ category: 'All' })
 
-// 获取用户 Cookie
 const userCookie = useCookie<any>('user-data')
 const userId = computed(() => userCookie.value?.id)
 
-// --- 1. 数据获取 ---
-
-// 获取图书列表
+// --- 数据获取 ---
 const { data: books, status, refresh: refreshBooks } = await useApi<Book[]>('/books')
-
-// 获取借阅状态 (Jules Fix: 使用匿名函数传递动态路径以修复 TS 类型报错)
 const { data: userStatus, refresh: refreshStatus } = await useApi<any>(
   () => userId.value ? `/borrowings/${userId.value}/status` : null
 )
 
-// --- 2. 交互逻辑 ---
-
-// 当点击表格中的“眼睛”图标或查看按钮时
+// --- 交互逻辑 ---
 const handleView = (book: Book) => {
   selectedBook.value = { ...book }
   panelMode.value = 'view'
-  
-  // 滚动回顶部，让用户立即看到选中的书籍大封面和详情
-  if (import.meta.client) {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
 }
 
-// 处理借阅动作
+const resetSelection = () => {
+  selectedBook.value = createEmptyBook()
+}
+
 const handleBorrow = async (book: Book) => {
+  const toastStyle = { position: 'top-0 bottom-auto' as const }
+
   if (userStatus.value && !userStatus.value.canBorrow) {
-    const reason = userStatus.value.hasOverdue 
-      ? 'Please return overdue books first!' 
-      : 'You have reached the maximum borrow limit.'
-    alert(reason)
+    toast.add({
+      title: 'Action Denied',
+      description: userStatus.value.hasOverdue ? 'Please return overdue books first!' : 'Borrowing limit reached (10).',
+      color: 'rose',
+      icon: 'i-heroicons-x-circle-solid',
+      ui: toastStyle
+    })
     return
   }
 
@@ -159,32 +134,52 @@ const handleBorrow = async (book: Book) => {
       method: 'POST',
       headers: { Authorization: `Bearer ${useCookie('auth_token').value}` }
     })
-
-    alert(`Successfully borrowed: ${book.title}`)
     
-    // 串行同步刷新：更新图书库存和用户借阅配额
-    await Promise.all([
-      refreshBooks(),
-      refreshStatus()
-    ])
+    toast.add({
+      title: 'Success!',
+      description: `"${book.title}" added to your collection.`,
+      color: 'emerald',
+      icon: 'i-heroicons-check-circle-solid',
+      ui: toastStyle
+    })
+    
+    await Promise.all([refreshBooks(), refreshStatus()])
   } catch (err: any) {
-    alert(err.data?.message || 'Failed to process borrowing request.')
+    const errorMsg = err.data?.message || 'The request could not be completed.'
+    toast.add({ title: 'Borrow Failed', description: errorMsg, color: 'rose', ui: toastStyle })
   }
 }
 
-// 筛选逻辑
+// --- 过滤逻辑 ---
 const filteredBooks = computed(() => {
   const list = (unref(books) || []) as Book[]
   return list.filter((b) => {
+    const s = quickSearch.value.toLowerCase()
+    const matchSearch = (b.title || '').toLowerCase().includes(s) || (b.author || '').toLowerCase().includes(s)
     const matchCat = filter.category === 'All' || b.bookGenre === filter.category
-    const matchAuth = (b.author || '').toLowerCase().includes(filter.author.toLowerCase())
-    const matchRate = (b.rating || 0) >= filter.minRating
-    const matchSearch = (b.title || '').toLowerCase().includes(quickSearch.value.toLowerCase())
-    return matchCat && matchAuth && matchRate && matchSearch
+    return matchCat && matchSearch
   })
 })
 
-const resetFilters = () => {
-  filter.category = 'All'; filter.author = ''; filter.minRating = 0; quickSearch.value = ''
-}
+const resetFilters = () => { filter.category = 'All'; quickSearch.value = '' }
 </script>
+
+<style scoped>
+/* 深度字体策略：确保详情面板文字足够清晰 */
+.side-panel-deep-text :deep(label) {
+  @apply font-black text-slate-900 dark:text-white uppercase text-[11px] tracking-wider !important;
+}
+
+.side-panel-deep-text :deep(p),
+.side-panel-deep-text :deep(span) {
+  @apply font-bold text-slate-800 dark:text-slate-100 !important;
+}
+
+/* 移除导致显示不全的局部滚动限制 */
+:deep(.table-fixed-header thead th) {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 20 !important;
+  @apply bg-white dark:bg-slate-900 border-b-2 border-emerald-600 font-black text-slate-900 dark:text-white uppercase text-[10px] tracking-widest !important;
+}
+</style>

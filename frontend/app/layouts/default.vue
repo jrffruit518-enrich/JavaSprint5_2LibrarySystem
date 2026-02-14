@@ -1,10 +1,13 @@
 <template>
-  <div class="min-h-screen flex flex-col bg-white dark:bg-gray-900 transition-colors duration-300">
-    <header class="border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md z-50">
+  <div class="min-h-screen flex flex-col bg-visitor transition-colors duration-300 relative text-white">
+    
+    <header class="border-b border-white/10 sticky top-0 bg-white/5 dark:bg-black/20 backdrop-blur-2xl z-[100] shadow-2xl">
       <UContainer>
         <div class="h-16 flex items-center justify-between">
           <div class="flex items-center gap-8">
-            <AppLogo />
+            <div class="flex items-center brightness-0 invert opacity-100">
+              <AppLogo />
+            </div>
 
             <nav class="hidden md:flex items-center gap-1">
               <UButton
@@ -13,8 +16,7 @@
                 :to="item.to"
                 :icon="item.icon"
                 variant="ghost"
-                color="gray"
-                class="font-medium"
+                class="nav-btn font-bold transition-all hover:scale-105 active:scale-95"
               >
                 {{ item.label }}
               </UButton>
@@ -25,9 +27,9 @@
             <ClientOnly>
               <UButton
                 :icon="isDark ? 'i-heroicons-moon' : 'i-heroicons-sun'"
-                color="gray"
+                color="white"
                 variant="ghost"
-                aria-label="Theme"
+                class="hover:bg-white/10"
                 @click="isDark = !isDark"
               />
             </ClientOnly>
@@ -36,6 +38,7 @@
               to="/" 
               variant="solid" 
               color="primary"
+              class="btn-glow font-bold px-6 animate-spring-in"
               label="Sign In" 
             />
           </div>
@@ -43,19 +46,19 @@
       </UContainer>
     </header>
 
-    <main class="flex-1">
-      <UContainer class="py-12">
+    <main class="flex-1 relative z-10 flex items-start justify-center animate-spring-in">
+      <UContainer class="py-10 w-full">
         <slot />
       </UContainer>
     </main>
 
-    <footer class="border-t border-gray-100 dark:border-gray-800 py-8 bg-gray-50 dark:bg-gray-950">
+    <footer class="py-8 bg-black/40 backdrop-blur-xl border-t border-white/5">
       <UContainer>
-        <div class="flex flex-col md:flex-row justify-between items-center gap-4">
-          <p class="text-sm text-gray-500 italic">
-            Library Project • Built with Nuxt 4 & Jules Intelligence
+        <div class="flex flex-col md:flex-row justify-between items-center gap-4 text-white/40">
+          <p class="text-sm italic">
+            CloudLibrary • Built with Nuxt 4 & Jules Intelligence
           </p>
-          <div class="text-sm text-gray-400 font-mono">
+          <div class="text-sm font-mono opacity-60">
             © {{ new Date().getFullYear() }} All Rights Reserved.
           </div>
         </div>
@@ -66,15 +69,12 @@
 
 <script setup lang="ts">
 /**
- * Default Layout - Jules v2 Standard
- * 1. 修复：将 /login 链接统一指向 / (index.vue)
- * 2. 修复：手动实现 ColorMode 切换以移除警告
- * 3. 修复：集成 AppLogo 统一品牌
+ * Default Layout (Visitor Mode) - Jules v3.2
+ * Refined for Glassmorphism & Performance.
  */
 
 const colorMode = useColorMode()
 
-// 响应式计算属性：控制黑夜模式
 const isDark = computed({
   get () {
     return colorMode.value === 'dark'
@@ -84,17 +84,27 @@ const isDark = computed({
   }
 })
 
-// 导航配置
 const navItems = [
-  { label: 'Home', to: '/', icon: 'i-heroicons-home' },
-  { label: 'Browse Books', to: '/books', icon: 'i-heroicons-book-open' },
-  { label: 'About', to: '/about', icon: 'i-heroicons-information-circle' }
+  { label: 'Home', to: '/', icon: 'i-heroicons-home-modern' },
+  { label: 'Books', to: '/books', icon: 'i-heroicons-book-open' },
+  { label: 'About', to: '/about', icon: 'i-heroicons-sparkles' }
 ]
 </script>
 
 <style scoped>
-/* 激活状态的导航链接样式 */
+/* Cleaned up duplicate card styles to allow app.config.ts to take control.
+  Retained only essential button and active state styles.
+*/
+.nav-btn {
+  @apply text-white/80 hover:text-white;
+}
+
 .router-link-active {
-  @apply text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20;
+  @apply bg-white/20 text-emerald-400 border-b-2 border-emerald-400 !important;
+}
+
+/* Custom glow handled by tailwind.config pulse but kept here for specific focus */
+.btn-glow {
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
 }
 </style>

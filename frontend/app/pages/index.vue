@@ -1,36 +1,48 @@
 <template>
-  <div class="flex flex-col items-center justify-center py-20">
-    <div class="text-center mb-10">
-      <UIcon
-        name="i-heroicons-building-library"
-        class="w-16 h-16 text-primary mx-auto mb-4"
-      />
-      <h1 class="text-4xl font-bold text-green-500">
-        Library Management System
+  <div class="flex flex-col items-center justify-center min-h-[80vh] px-4">
+    <div class="text-center mb-12 animate-spring-in">
+      <div class="relative inline-block mb-4">
+        <div class="absolute inset-0 bg-emerald-500/20 blur-2xl rounded-full"></div>
+        <UIcon
+          name="i-heroicons-building-library-solid"
+          class="w-20 h-20 text-emerald-600 dark:text-emerald-400 relative z-10"
+        />
+      </div>
+      <h1 class="text-5xl font-black tracking-tighter bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-400 bg-clip-text text-transparent">
+        Cloud<span class="text-emerald-600 dark:text-emerald-400">Library</span>
       </h1>
-      <p class="text-gray-500 mt-2">
-        Welcome! Please manage your collection or start reading.
+      <p class="text-xs font-black uppercase tracking-[0.4em] text-slate-400 mt-2">
+        Integrated Management System
       </p>
     </div>
 
-    <UCard class="w-full max-w-sm border-2 border-primary/10 shadow-xl">
-      <div class="flex flex-col gap-4">
+    <UCard 
+      class="w-full max-w-sm glass-effect border-none shadow-2xl"
+      :ui="{ base: 'overflow-hidden', body: { padding: 'p-8' } }"
+    >
+      <div class="flex flex-col gap-5">
         <UButton
           to="/register"
           size="xl"
-          icon="i-heroicons-user-plus"
+          icon="i-heroicons-user-plus-solid"
           block
+          color="emerald"
+          class="btn-glow font-black py-4 rounded-xl transition-all active:scale-95"
         >
           Create New Account
         </UButton>
 
-        <UDivider label="OR" />
+        <div class="relative py-2">
+          <UDivider label="SECURE ACCESS" :ui="{ label: 'text-[10px] font-black text-slate-400' }" />
+        </div>
 
         <UButton
           size="xl"
-          variant="outline"
-          icon="i-heroicons-arrow-left-on-rectangle"
+          variant="soft"
+          color="gray"
+          icon="i-heroicons-arrow-left-on-rectangle-solid"
           block
+          class="font-black py-4 rounded-xl hover:bg-emerald-500/10 hover:text-emerald-600 transition-all active:scale-95"
           @click="isLoginModalOpen = true"
         >
           User Login
@@ -39,46 +51,61 @@
     </UCard>
 
     <UModal v-model="isLoginModalOpen">
-      <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
+      <UCard 
+        class="glass-effect border-none shadow-2xl"
+        :ui="{ 
+          ring: '', 
+          divide: 'divide-y divide-white/5',
+          header: { base: 'bg-white/40 dark:bg-white/5' }
+        }"
+      >
         <template #header>
-          <div class="flex items-center gap-2">
-            <UIcon name="i-heroicons-lock-closed" class="text-primary" />
-            <h3 class="text-base font-semibold">User Login</h3>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <UIcon name="i-heroicons-lock-closed-solid" class="text-emerald-500" />
+              <h3 class="text-sm font-black uppercase tracking-widest text-slate-700 dark:text-white">Authentication</h3>
+            </div>
+            <UButton color="gray" variant="ghost" icon="i-heroicons-x-mark" @click="isLoginModalOpen = false" />
           </div>
         </template>
 
         <UForm
           :state="loginForm"
-          class="space-y-4"
+          class="space-y-6 py-4"
           @submit="handleLogin"
         >
-          <UFormGroup label="Username" name="username" required>
+          <UFormGroup label="Identity" name="username" :ui="{ label: { base: 'text-[10px] font-black uppercase text-slate-400' } }">
             <UInput
               v-model="loginForm.username"
-              placeholder="Enter your username"
-              icon="i-heroicons-user"
+              placeholder="Username"
+              icon="i-heroicons-user-solid"
+              size="lg"
               autofocus
             />
           </UFormGroup>
 
-          <UFormGroup label="Password" name="password" required>
+          <UFormGroup label="Security Key" name="password" :ui="{ label: { base: 'text-[10px] font-black uppercase text-slate-400' } }">
             <UInput
               v-model="loginForm.password"
               type="password"
-              icon="i-heroicons-key"
+              placeholder="••••••••"
+              icon="i-heroicons-key-solid"
+              size="lg"
             />
           </UFormGroup>
 
-          <div class="flex justify-end gap-3 mt-6">
+          <div class="flex justify-end gap-3 pt-4">
             <UButton
               label="Cancel"
               variant="ghost"
+              class="font-bold"
               @click="isLoginModalOpen = false"
             />
             <UButton
               type="submit"
-              label="Sign In"
-              color="primary"
+              label="Authorize"
+              color="emerald"
+              class="btn-glow font-black px-8 rounded-lg"
               :loading="isPending"
             />
           </div>
@@ -90,12 +117,11 @@
 
 <script setup lang="ts">
 /**
- * 图书馆项目 - 登录入口 (Standard v3)
- * Jules Fix: 
- * 1. 注入 user_id Cookie 以便后续页面调用 MongoDB。
- * 2. 统一 Cookie 配置。
+ * Index Page (Jules v4.0 - Immersive Login)
+ * Final Refactor: Switched alert to useToast, unified branding styles.
  */
 
+const toast = useToast()
 const isLoginModalOpen = ref(false)
 const isPending = ref(false)
 const loginForm = reactive({
@@ -106,11 +132,10 @@ const loginForm = reactive({
 const handleLogin = async () => {
   isPending.value = true
   
-  // Cookie 配置统一设置
   const cookieOptions = { path: '/', maxAge: 86400, sameSite: 'lax' as const }
   const authCookie = useCookie('auth_token', cookieOptions)
   const roleCookie = useCookie('user_role', cookieOptions)
-  const userIdCookie = useCookie('user_id', cookieOptions) // Jules Fix: 新增 ID Cookie
+  const userIdCookie = useCookie('user_id', cookieOptions)
 
   try {
     const response = await $fetch<any>('/api/auth/login', {
@@ -119,34 +144,55 @@ const handleLogin = async () => {
     })
 
     if (response.token) {
-      // 1. 存储 Token
       authCookie.value = response.token
-      
-      // 2. 存储 User ID (关键修复：从后端响应中提取 id)
-      // 如果你的后端返回的字段是 response.id，这里就对了
       userIdCookie.value = response.id 
       
-      // 3. 存储角色逻辑
       let role = response.role || (loginForm.username === 'admin' ? 'ROLE_ADMIN' : 'ROLE_MEMBER')
       if (!role.startsWith('ROLE_')) {
         role = `ROLE_${role.toUpperCase()}`
       }
       roleCookie.value = role
 
+      toast.add({
+        title: 'Access Granted',
+        description: `Welcome back, ${loginForm.username}.`,
+        color: 'emerald',
+        icon: 'i-heroicons-check-circle'
+      })
+
       isLoginModalOpen.value = false
 
-      // 4. 跳转逻辑
-      if (role === 'ROLE_ADMIN') {
-        await navigateTo('/admin')
-      } else {
-        await navigateTo('/user/books')
-      }
+      // 延迟跳转，确保动画流畅
+      setTimeout(async () => {
+        if (role === 'ROLE_ADMIN') {
+          await navigateTo('/admin')
+        } else {
+          await navigateTo('/user/books')
+        }
+      }, 500)
     }
   } catch (error: any) {
     console.error('Login Error:', error)
-    alert(error.data?.message || 'Login failed. Please check your credentials.')
+    // 消灭浏览器 Alert，改用 Toast
+    toast.add({
+      title: 'Access Denied',
+      description: error.data?.message || 'Invalid credentials. Please verify your identity.',
+      color: 'rose',
+      icon: 'i-heroicons-exclamation-triangle'
+    })
   } finally {
     isPending.value = false
   }
 }
 </script>
+
+<style scoped>
+.animate-spring-in {
+  animation: spring-in 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes spring-in {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>

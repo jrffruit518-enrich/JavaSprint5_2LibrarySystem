@@ -1,19 +1,26 @@
 <template>
   <ClientOnly>
-    <div class="space-y-6 p-6">
-      <nav class="text-sm text-gray-500">Admin > User Management</nav>
-
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-2xl font-bold text-green-500">User Management</h1>
-          <p class="text-sm text-gray-500">Administrative Control Panel & Staff Access</p>
+    <div class="space-y-6 animate-spring-in">
+      <div class="flex items-center justify-between bg-slate-900 text-white p-6 rounded-xl border border-slate-800 shadow-xl">
+        <div class="flex items-center gap-4">
+          <div class="bg-emerald-500/20 p-3 rounded-lg">
+            <UIcon name="i-heroicons-users-solid" class="w-8 h-8 text-emerald-500" />
+          </div>
+          <div>
+            <h1 class="text-2xl font-black leading-tight tracking-tighter uppercase">
+              User <span class="text-emerald-500">Directory</span>
+            </h1>
+            <p class="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">Administrative Control & Staff Access</p>
+          </div>
         </div>
 
         <UButton
           v-if="currentMode === 'view'"
           label="Add New Admin"
-          icon="i-heroicons-user-plus"
-          color="primary"
+          icon="i-heroicons-user-plus-solid"
+          size="lg"
+          color="emerald"
+          class="font-black px-8 rounded-full shadow-lg hover:scale-105 transition-transform"
           @click="currentMode = 'add'"
         />
         <UButton
@@ -21,90 +28,125 @@
           label="Back to List"
           icon="i-heroicons-arrow-left"
           variant="ghost"
+          color="white"
+          class="font-bold"
           @click="currentMode = 'view'"
         />
       </div>
 
-      <UCard v-if="currentMode === 'add'" class="border-2 border-primary/20 shadow-lg max-w-2xl mx-auto">
+      <UCard v-if="currentMode === 'add'" class="glass-effect shadow-2xl max-w-2xl mx-auto ring-1 ring-emerald-500/30 animate-spring-in">
         <template #header>
-          <div class="flex items-center gap-2 font-bold">
-            <UIcon name="i-heroicons-shield-check" class="text-primary" />
+          <div class="flex items-center gap-2 font-black text-xl uppercase tracking-tighter text-slate-900 dark:text-white">
+            <UIcon name="i-heroicons-shield-check-solid" class="text-emerald-500 w-7 h-7" />
             Register New Administrator
           </div>
         </template>
         
-        <form class="space-y-4" @submit.prevent="handleSaveAdmin">
-          <UFormGroup label="Admin Username" required>
-            <UInput v-model="newAdmin.username" icon="i-heroicons-user" placeholder="Enter admin username" />
+        <form class="space-y-5 p-2" @submit.prevent="handleSaveAdmin">
+          <UFormGroup label="Admin Username" required class="font-bold">
+            <UInput v-model="newAdmin.username" icon="i-heroicons-user" placeholder="Enter admin username" size="md" />
           </UFormGroup>
-          <UFormGroup label="Email Address" required>
-            <UInput v-model="newAdmin.email" icon="i-heroicons-envelope" type="email" placeholder="admin@example.com" />
+          <UFormGroup label="Email Address" required class="font-bold">
+            <UInput v-model="newAdmin.email" icon="i-heroicons-envelope" type="email" placeholder="admin@example.com" size="md" />
           </UFormGroup>
-          <UFormGroup label="Initial Password" required>
-            <UInput v-model="newAdmin.password" icon="i-heroicons-lock-closed" type="password" />
+          <UFormGroup label="Initial Password" required class="font-bold">
+            <UInput v-model="newAdmin.password" icon="i-heroicons-lock-closed" type="password" size="md" />
           </UFormGroup>
           
-          <div class="flex justify-end gap-3 pt-4 border-t">
-            <UButton label="Cancel" variant="ghost" @click="currentMode = 'view'" />
-            <UButton type="submit" label="Confirm & Create" color="primary" :loading="pending" />
+          <div class="flex justify-end gap-3 pt-6 border-t border-gray-100 dark:border-gray-700">
+            <UButton label="Cancel" variant="ghost" color="gray" @click="currentMode = 'view'" />
+            <UButton type="submit" label="Confirm & Create" color="emerald" class="px-6 font-black" :loading="pending" />
           </div>
         </form>
       </UCard>
 
-      <UAlert
-        v-if="apiError"
-        icon="i-heroicons-exclamation-circle"
-        color="red"
-        variant="soft"
-        title="Fetch Error"
-        :description="apiError.message || 'Failed to sync with user database.'"
-      />
+      <div v-show="currentMode === 'view'" class="bg-white dark:bg-gray-800 p-5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-wrap items-end gap-4">
+        <UFormGroup label="Username" class="flex-1 min-w-[150px]" size="sm">
+          <UInput v-model="filter.username" icon="i-heroicons-user" placeholder="Search user..." input-class="font-bold" />
+        </UFormGroup>
+        
+        <UFormGroup label="Email" class="flex-1 min-w-[150px]" size="sm">
+          <UInput v-model="filter.email" icon="i-heroicons-envelope" placeholder="Search email..." input-class="font-bold" />
+        </UFormGroup>
 
-      <UCard v-show="currentMode === 'view'" :ui="{ body: 'p-0' }" class="overflow-hidden">
-        <UTable
-          :rows="users"
-          :columns="columns"
-          :loading="status === 'pending'"
-        >
-          <template #userRole-data="{ row }">
-            <UBadge 
-              :color="row.userRole === 'ROLE_ADMIN' ? 'primary' : 'gray'" 
-              variant="subtle"
-              class="capitalize"
-            >
-              {{ row.userRole.replace('ROLE_', '') }}
-            </UBadge>
-          </template>
+        <UFormGroup label="Role" class="w-36" size="sm">
+          <USelect v-model="filter.role" :options="['All', 'ADMIN', 'USER']" />
+        </UFormGroup>
 
-          <template #enabled-data="{ row }">
-            <UBadge :color="row.enabled ? 'green' : 'red'" variant="outline">
-              {{ row.enabled ? 'Active' : 'Disabled' }}
-            </UBadge>
-          </template>
+        <UFormGroup label="Status" class="w-32" size="sm">
+          <USelect 
+            v-model="filter.status" 
+            :options="[
+              { label: 'All', value: 'all' },
+              { label: 'Active', value: 'true' },
+              { label: 'Disabled', value: 'false' }
+            ]" 
+          />
+        </UFormGroup>
 
-          <template #actions-data="{ row }">
-            <div class="flex items-center gap-2">
-              <UTooltip :text="row.enabled ? 'Disable User' : 'Enable User'">
-                <UButton
-                  :icon="row.enabled ? 'i-heroicons-user-minus' : 'i-heroicons-user-plus'"
-                  size="sm"
-                  :color="row.enabled ? 'orange' : 'green'"
-                  variant="ghost"
-                  @click="handleToggleStatus(row)"
-                />
-              </UTooltip>
-              <UTooltip text="Delete User">
-                <UButton
-                  icon="i-heroicons-trash"
-                  size="sm"
-                  color="red"
-                  variant="ghost"
-                  @click="handleDeleteUser(row)"
-                />
-              </UTooltip>
-            </div>
-          </template>
-        </UTable>
+        <UButton icon="i-heroicons-arrow-path" color="gray" variant="soft" size="sm" class="mb-[2px] font-bold" @click="resetFilters">Reset</UButton>
+      </div>
+
+      <UCard v-show="currentMode === 'view'" class="border-none shadow-xl ring-1 ring-gray-200 dark:ring-gray-700 overflow-hidden" :ui="{ body: { padding: 'p-0' } }">
+        <div class="h-[calc(100vh-420px)] overflow-y-auto relative custom-scrollbar">
+          <UTable
+            :rows="filteredUsers"
+            :columns="columns"
+            :loading="status === 'pending'"
+            class="w-full"
+            :ui="{ 
+              wrapper: 'relative overflow-visible', 
+              thead: 'table-header-sticky',
+              th: { base: 'text-xs font-black text-slate-900 dark:text-white uppercase py-4 px-4 text-center bg-gray-50 dark:bg-slate-900 tracking-widest' },
+              td: { base: 'text-sm py-4 px-4 text-center align-middle font-medium' }
+            }"
+          >
+            <template #userRole-data="{ row }">
+              <div class="flex justify-center">
+                <UBadge 
+                  :color="row.userRole === 'ROLE_ADMIN' ? 'emerald' : 'slate'" 
+                  variant="subtle"
+                  class="font-black scale-90 px-3 py-1 rounded-md"
+                >
+                  {{ row.userRole.replace('ROLE_', '') }}
+                </UBadge>
+              </div>
+            </template>
+
+            <template #enabled-data="{ row }">
+              <div class="flex justify-center">
+                <UBadge :color="row.enabled ? 'emerald' : 'rose'" variant="soft" class="font-bold uppercase text-[10px]">
+                  {{ row.enabled ? 'Active' : 'Disabled' }}
+                </UBadge>
+              </div>
+            </template>
+
+            <template #actions-data="{ row }">
+              <div class="flex items-center justify-center gap-2">
+                <UTooltip :text="row.enabled ? 'Disable Account' : 'Enable Account'">
+                  <UButton
+                    :icon="row.enabled ? 'i-heroicons-lock-closed' : 'i-heroicons-lock-open'"
+                    size="xs"
+                    :color="row.enabled ? 'amber' : 'emerald'"
+                    variant="soft"
+                    class="rounded-lg"
+                    @click="handleToggleStatus(row)"
+                  />
+                </UTooltip>
+                <UTooltip text="Delete User">
+                  <UButton
+                    icon="i-heroicons-trash"
+                    size="xs"
+                    color="rose"
+                    variant="ghost"
+                    class="rounded-lg hover:bg-rose-50"
+                    @click="handleDeleteUser(row)"
+                  />
+                </UTooltip>
+              </div>
+            </template>
+          </UTable>
+        </div>
       </UCard>
     </div>
   </ClientOnly>
@@ -113,70 +155,69 @@
 <script setup lang="ts">
 import { type UserRow } from '~/types/user'
 
-definePageMeta({
-  layout: 'admin',
-  middleware: 'auth'
-})
+definePageMeta({ layout: 'admin', middleware: 'auth' })
 
-// --- 状态与配置 ---
 const currentMode = ref<'view' | 'add'>('view')
 const newAdmin = ref({ username: '', email: '', password: '' })
 const pending = ref(false)
-
-const columns = [
-  { key: 'id', label: 'ID' },
-  { key: 'username', label: 'Username' },
-  { key: 'email', label: 'Email' },
-  { key: 'userRole', label: 'Role' },
-  { key: 'enabled', label: 'Status' },
-  { key: 'actions', label: 'Actions' }
-]
-
-// --- 1. 数据获取逻辑 ---
-const { data: rawUsers, refresh, status, error: apiError } = await useApi<any>('/users')
-
-const users = computed<UserRow[]>(() => {
-  const data = unref(rawUsers)
-  const content = Array.isArray(data) ? data : (data?.content || [])
-  return content.map((u: any) => ({
-    id: u.id,
-    username: u.username ?? '—',
-    email: u.email ?? '—',
-    userRole: u.userRole ?? 'UNKNOWN',
-    enabled: !!u.enabled
-  }))
+const filter = reactive({
+  username: '',
+  email: '',
+  role: 'All',
+  status: 'all'
 })
 
-// --- 2. 交互操作逻辑 ---
+const columns = [
+  { key: 'id', label: 'ID', class: 'w-[10%]' },
+  { key: 'username', label: 'Username', class: 'w-[25%]' },
+  { key: 'email', label: 'Email Address', class: 'w-[30%]' },
+  { key: 'userRole', label: 'Access Level', class: 'w-[15%]' },
+  { key: 'enabled', label: 'Security Status', class: 'w-[10%]' },
+  { key: 'actions', label: 'Actions', class: 'w-[10%]' }
+]
 
-/**
- * Jules Fix: 匹配后端 @RequestBody Map<String, Boolean> payload
- * 1. 使用 PATCH 方法
- * 2. Body 结构必须为 { enabled: boolean }
- */
+const { data: rawUsers, refresh, status } = await useApi<any>('/users')
+
+const resetFilters = () => {
+  filter.username = ''; filter.email = ''; filter.role = 'All'; filter.status = 'all'
+}
+
+const filteredUsers = computed<UserRow[]>(() => {
+  const data = unref(rawUsers)
+  const content = (Array.isArray(data) ? data : (data?.content || [])) as any[]
+  
+  return content
+    .map(u => ({
+      id: u.id,
+      username: u.username ?? '—',
+      email: u.email ?? '—',
+      userRole: u.userRole ?? 'UNKNOWN',
+      enabled: !!u.enabled
+    }))
+    .filter(user => {
+      const matchName = user.username.toLowerCase().includes(filter.username.toLowerCase())
+      const matchEmail = user.email.toLowerCase().includes(filter.email.toLowerCase())
+      const matchRole = filter.role === 'All' || user.userRole.includes(filter.role)
+      const matchStatus = filter.status === 'all' || user.enabled.toString() === filter.status
+      return matchName && matchEmail && matchRole && matchStatus
+    })
+})
+
 const handleToggleStatus = async (user: UserRow) => {
   try {
     await $fetch(`/api/users/${user.id}/status`, {
       method: 'PATCH',
-      body: { enabled: !user.enabled }, // 精确匹配后端 Map 取值
-      headers: { 
-        Authorization: `Bearer ${useCookie('auth_token').value}` 
-      }
+      body: { enabled: !user.enabled },
+      headers: { Authorization: `Bearer ${useCookie('auth_token').value}` }
     })
-    
-    // 成功后刷新列表
     await refresh()
   } catch (err: any) {
-    // 捕获 Root Admin 保护 (ForbiddenException) 或其他错误
-    const errorMsg = err.data?.message || 'Status update failed'
-    alert(`Error: ${errorMsg}`)
-    console.error('Update failed:', err.data)
+    alert(`Status Update Failed: ${err.data?.message || 'Unauthorized action'}`)
   }
 }
 
-// 删除用户
 const handleDeleteUser = async (user: UserRow) => {
-  if (!confirm(`Are you sure you want to delete user: ${user.username}?`)) return
+  if (!confirm(`CAUTION: Permanently delete ${user.username}? This cannot be undone.`)) return
   try {
     await $fetch(`/api/users/${user.id}`, {
       method: 'DELETE',
@@ -184,11 +225,10 @@ const handleDeleteUser = async (user: UserRow) => {
     })
     await refresh()
   } catch (err: any) {
-    alert('Delete failed')
+    alert('Delete operation failed.')
   }
 }
 
-// 保存新管理员
 const handleSaveAdmin = async () => {
   pending.value = true
   try {
@@ -201,9 +241,45 @@ const handleSaveAdmin = async () => {
     newAdmin.value = { username: '', email: '', password: '' } 
     await refresh()
   } catch (err: any) {
-    alert('Failed to create admin: ' + (err.data?.message || 'Check inputs'))
+    alert('Failed to create admin: ' + (err.data?.message || 'Check connection'))
   } finally {
     pending.value = false
   }
 }
 </script>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { @apply bg-emerald-200 rounded-full hover:bg-emerald-300 transition-colors; }
+
+.glass-effect {
+  @apply bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-white/20;
+}
+
+:deep(.table-header-sticky) {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 30 !important;
+}
+
+:deep(table) {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  table-layout: fixed !important;
+}
+
+:deep(thead th) {
+  position: sticky !important;
+  top: 0 !important;
+  border-bottom: 3px solid #10b981 !important; 
+  box-shadow: 0 1px 0 0 #10b981;
+}
+
+@keyframes spring-in {
+  0% { transform: scale(0.98); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-spring-in {
+  animation: spring-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+</style>
