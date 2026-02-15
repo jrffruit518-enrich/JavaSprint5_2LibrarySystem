@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full space-y-6">
+  <div class="w-full space-y-6 animate-spring-in">
     <div class="flex justify-between items-center bg-slate-900 text-white p-6 rounded-xl shadow-xl border border-slate-800">
       <div class="flex items-center gap-4">
         <div class="bg-emerald-500/20 p-3 rounded-lg">
@@ -71,7 +71,6 @@
     </div>
 
     <div class="grid grid-cols-12 gap-6 items-start">
-      
       <main class="col-span-12 lg:col-span-9">
         <UCard class="border-none shadow-xl ring-1 ring-gray-200 dark:ring-gray-700 overflow-hidden" :ui="{ body: { padding: 'p-0' } }">
           <div class="h-[calc(100vh-420px)] overflow-hidden">
@@ -80,7 +79,7 @@
               :loading="status === 'pending'" 
               role="admin"
               @view="handleView"
-              @delete="handleDelete"
+              @delete="openDeleteConfirm" 
             />
           </div>
         </UCard>
@@ -92,24 +91,60 @@
             :book="selectedBook" 
             :mode="panelMode" 
             role="admin" 
+            :loading="isSaving"
             @save="handleSave"
             @change-mode="(m) => panelMode = m"
             @close="resetSelection" 
           />
         </div>
       </aside>
-
     </div>
+
+    <UModal v-model="isDeleteModalOpen">
+      <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
+        <template #header>
+          <div class="flex items-center gap-3 text-rose-500">
+            <UIcon name="i-heroicons-exclamation-triangle-solid" class="w-6 h-6" />
+            <span class="font-black uppercase tracking-widest">Confirm Deletion</span>
+          </div>
+        </template>
+
+        <div class="p-4">
+          <p class="text-sm font-bold text-slate-600 dark:text-slate-300">
+            Are you sure you want to delete <span class="text-rose-600">"{{ bookToDelete?.title }}"</span>? 
+            This action will permanently remove the record.
+          </p>
+        </div>
+
+        <template #footer>
+          <div class="flex justify-end gap-3">
+            <UButton color="gray" variant="ghost" label="Cancel" @click="isDeleteModalOpen = false" />
+            <UButton color="rose" label="Delete Book" :loading="isDeleting" @click="handleDelete" />
+          </div>
+        </template>
+      </UCard>
+    </UModal>
   </div>
 </template>
 
 <script setup lang="ts">
+/**
+ * Admin Inventory Management - UI Upgrade v2.3 (No Native Alerts)
+ * 1. 彻底消灭原生 confirm 和 alert。
+ * 2. 保持完整过滤逻辑与样式策略。
+ */
 import { type Book, createEmptyBook } from '~/types/book'
 
 definePageMeta({
   layout: 'admin',
   middleware: 'auth'
 })
+
+const toast = useToast()
+const isSaving = ref(false)
+const isDeleting = ref(false)
+const isDeleteModalOpen = ref(false)
+const bookToDelete = ref<Book | null>(null)
 
 // --- 状态与过滤器 ---
 const selectedBook = ref<Book>(createEmptyBook())
@@ -150,7 +185,8 @@ const handleSave = async (bookData: Book) => {
   const isNew = panelMode.value === 'add'
   const url = isNew ? '/books' : `/books/${bookData.id}`
   const method = isNew ? 'POST' : 'PUT'
-
+  
+  isSaving.value = true
   try {
     await $fetch(`/api${url}`, {
       method,
@@ -158,50 +194,82 @@ const handleSave = async (bookData: Book) => {
       headers: { Authorization: `Bearer ${useCookie('auth_token').value}` }
     })
 
-    alert(isNew ? 'New book created!' : 'Book updated successfully!')
+    toast.add({
+      title: isNew ? 'Book Created' : 'Update Successful',
+      description: `"${bookData.title}" has been saved.`,
+      color: 'emerald',
+      icon: 'i-heroicons-check-circle'
+    })
+
     panelMode.value = 'view'
     await refresh()
   } catch (err: any) {
-    alert(err.data?.message || 'Failed to save changes.')
+    toast.add({
+      title: 'Save Failed',
+      description: err.data?.message || 'Database connection error.',
+      color: 'rose',
+      icon: 'i-heroicons-exclamation-triangle'
+    })
+  } finally {
+    isSaving.value = false
   }
 }
 
-const handleDelete = async (book: Book) => {
-  if (!confirm(`Are you sure you want to delete "${book.title}"?`)) return
+// 弹出删除确认
+const openDeleteConfirm = (book: Book) => {
+  bookToDelete.value = book
+  isDeleteModalOpen.value = true
+}
 
+// 执行删除逻辑
+const handleDelete = async () => {
+  if (!bookToDelete.value) return
+  
+  isDeleting.value = true
   try {
-    await $fetch(`/api/books/${book.id}`, {
+    await $fetch(`/api/books/${bookToDelete.value.id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${useCookie('auth_token').value}` }
     })
-    alert('Book deleted.')
-    if (selectedBook.value.id === book.id) {
+    
+    toast.add({
+      title: 'Book Removed',
+      description: `"${bookToDelete.value.title}" was deleted.`,
+      color: 'rose',
+      icon: 'i-heroicons-trash'
+    })
+
+    if (selectedBook.value.id === bookToDelete.value.id) {
       resetSelection()
     }
+    isDeleteModalOpen.value = false
     await refresh()
   } catch (err: any) {
-    alert('Failed to delete book.')
+    toast.add({
+      title: 'Deletion Failed',
+      color: 'rose',
+      icon: 'i-heroicons-x-mark'
+    })
+  } finally {
+    isDeleting.value = false
+    bookToDelete.value = null
   }
 }
 
-// --- 复合过滤逻辑 ---
+// --- 复合过滤逻辑 (保持完整) ---
 const filteredBooks = computed(() => {
   const list = (unref(books) || []) as Book[]
   return list.filter(b => {
-    // 1. 标题/作者 搜索
     const matchQuery = !filters.query || 
       (b.title || '').toLowerCase().includes(filters.query.toLowerCase()) ||
       (b.author || '').toLowerCase().includes(filters.query.toLowerCase())
     
-    // 2. 分类过滤 (对应 bookGenre)
     const matchGenre = filters.genre === 'ALL' || b.bookGenre === filters.genre
     
-    // 3. 库存过滤 (对应 availableStock)
     const stockCount = b.availableStock ?? 0
     const matchStock = filters.stock === 'ALL' || 
       (filters.stock === 'IN_STOCK' ? stockCount > 0 : stockCount === 0)
     
-    // 4. 评分过滤
     const matchRating = (b.rating ?? 0) >= filters.rating
 
     return matchQuery && matchGenre && matchStock && matchRating
@@ -210,11 +278,19 @@ const filteredBooks = computed(() => {
 </script>
 
 <style scoped>
+.animate-spring-in {
+  animation: spring-in 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes spring-in {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 :deep(.book-table-root) {
   height: 100%;
 }
 
-/* 侧导航字体深度加重策略 */
 .side-panel-deep-text :deep(label) {
   @apply font-black text-slate-900 dark:text-white uppercase text-[11px] tracking-wider !important;
 }

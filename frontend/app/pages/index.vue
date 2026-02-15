@@ -27,7 +27,7 @@
           icon="i-heroicons-user-plus-solid"
           block
           color="emerald"
-          class="btn-glow font-black py-4 rounded-xl transition-all active:scale-95"
+          class="btn-glow btn-shimmer font-black py-4 rounded-xl transition-all active:scale-95"
         >
           Create New Account
         </UButton>
@@ -105,7 +105,7 @@
               type="submit"
               label="Authorize"
               color="emerald"
-              class="btn-glow font-black px-8 rounded-lg"
+              class="btn-glow btn-shimmer font-black px-8 rounded-lg"
               :loading="isPending"
             />
           </div>
@@ -117,8 +117,7 @@
 
 <script setup lang="ts">
 /**
- * Index Page (Jules v4.0 - Immersive Login)
- * Final Refactor: Switched alert to useToast, unified branding styles.
+ * Index Page (Jules v4.2 - Immersive Login + Shimmer Effect)
  */
 
 const toast = useToast()
@@ -162,18 +161,16 @@ const handleLogin = async () => {
 
       isLoginModalOpen.value = false
 
-      // 延迟跳转，确保动画流畅
       setTimeout(async () => {
         if (role === 'ROLE_ADMIN') {
           await navigateTo('/admin')
         } else {
-          await navigateTo('/user/books')
+          await navigateTo('/user')
         }
       }, 500)
     }
   } catch (error: any) {
     console.error('Login Error:', error)
-    // 消灭浏览器 Alert，改用 Toast
     toast.add({
       title: 'Access Denied',
       description: error.data?.message || 'Invalid credentials. Please verify your identity.',

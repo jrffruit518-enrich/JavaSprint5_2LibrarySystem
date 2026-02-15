@@ -38,7 +38,7 @@
         <template #header>
           <div class="flex items-center gap-2 font-black text-xl uppercase tracking-tighter text-slate-900 dark:text-white">
             <UIcon name="i-heroicons-shield-check-solid" class="text-emerald-500 w-7 h-7" />
-            Register New Administrator
+            <span>Register New Administrator</span>
           </div>
         </template>
         
@@ -130,7 +130,7 @@
                     :color="row.enabled ? 'amber' : 'emerald'"
                     variant="soft"
                     class="rounded-lg"
-                    @click="handleToggleStatus(row)"
+                    @click="triggerConfirm('lock', row)"
                   />
                 </UTooltip>
                 <UTooltip text="Delete User">
@@ -140,7 +140,7 @@
                     color="rose"
                     variant="ghost"
                     class="rounded-lg hover:bg-rose-50"
-                    @click="handleDeleteUser(row)"
+                    @click="triggerConfirm('delete', row)"
                   />
                 </UTooltip>
               </div>
@@ -148,18 +148,63 @@
           </UTable>
         </div>
       </UCard>
+
+      <UModal v-model="confirmModal.isOpen">
+        <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
+          <template #header>
+            <div class="flex items-center gap-3" :class="confirmModal.type === 'delete' ? 'text-rose-500' : 'text-amber-500'">
+              <UIcon :name="confirmModal.type === 'delete' ? 'i-heroicons-trash-solid' : 'i-heroicons-shield-exclamation-solid'" class="w-6 h-6" />
+              <span class="font-black uppercase tracking-widest">{{ confirmModal.title }}</span>
+            </div>
+          </template>
+
+          <div class="p-4">
+            <p class="text-sm font-bold text-slate-600 dark:text-slate-300">
+              {{ confirmModal.message }} <span :class="confirmModal.type === 'delete' ? 'text-rose-600' : 'text-amber-600'">"{{ confirmModal.targetUser?.username }}"</span>?
+            </p>
+          </div>
+
+          <template #footer>
+            <div class="flex justify-end gap-3">
+              <UButton color="gray" variant="ghost" label="Cancel" @click="confirmModal.isOpen = false" />
+              <UButton 
+                :color="confirmModal.type === 'delete' ? 'rose' : 'amber'" 
+                :label="confirmModal.confirmLabel" 
+                :loading="actionPending" 
+                @click="executeConfirmedAction" 
+              />
+            </div>
+          </template>
+        </UCard>
+      </UModal>
     </div>
   </ClientOnly>
 </template>
 
 <script setup lang="ts">
+/**
+ * User Directory Management - Nuxt UI Modal Upgrade
+ */
 import { type UserRow } from '~/types/user'
 
 definePageMeta({ layout: 'admin', middleware: 'auth' })
 
+const toast = useToast()
 const currentMode = ref<'view' | 'add'>('view')
 const newAdmin = ref({ username: '', email: '', password: '' })
 const pending = ref(false)
+const actionPending = ref(false)
+
+// Confirm Modal Reactive State
+const confirmModal = reactive({
+  isOpen: false,
+  type: 'delete' as 'delete' | 'lock',
+  title: '',
+  message: '',
+  confirmLabel: '',
+  targetUser: null as UserRow | null
+})
+
 const filter = reactive({
   username: '',
   email: '',
@@ -203,29 +248,62 @@ const filteredUsers = computed<UserRow[]>(() => {
     })
 })
 
-const handleToggleStatus = async (user: UserRow) => {
-  try {
-    await $fetch(`/api/users/${user.id}/status`, {
-      method: 'PATCH',
-      body: { enabled: !user.enabled },
-      headers: { Authorization: `Bearer ${useCookie('auth_token').value}` }
-    })
-    await refresh()
-  } catch (err: any) {
-    alert(`Status Update Failed: ${err.data?.message || 'Unauthorized action'}`)
+// Trigger logic for different actions
+const triggerConfirm = (type: 'delete' | 'lock', user: UserRow) => {
+  confirmModal.type = type
+  confirmModal.targetUser = user
+  confirmModal.isOpen = true
+  
+  if (type === 'delete') {
+    confirmModal.title = 'Confirm Deletion'
+    confirmModal.message = 'Are you sure you want to permanently delete'
+    confirmModal.confirmLabel = 'Delete User'
+  } else {
+    const action = user.enabled ? 'Disable' : 'Enable'
+    confirmModal.title = `${action} Account`
+    confirmModal.message = `Are you sure you want to ${action.toLowerCase()}`
+    confirmModal.confirmLabel = `${action} Now`
   }
 }
 
-const handleDeleteUser = async (user: UserRow) => {
-  if (!confirm(`CAUTION: Permanently delete ${user.username}? This cannot be undone.`)) return
+// Execute the confirmed action
+const executeConfirmedAction = async () => {
+  if (!confirmModal.targetUser) return
+  const user = confirmModal.targetUser
+  actionPending.value = true
+
   try {
-    await $fetch(`/api/users/${user.id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${useCookie('auth_token').value}` }
-    })
+    if (confirmModal.type === 'delete') {
+      await $fetch(`/api/users/${user.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${useCookie('auth_token').value}` }
+      })
+      toast.add({ title: 'User Deleted', color: 'emerald', icon: 'i-heroicons-trash' })
+    } else {
+      await $fetch(`/api/users/${user.id}/status`, {
+        method: 'PATCH',
+        body: { enabled: !user.enabled },
+        headers: { Authorization: `Bearer ${useCookie('auth_token').value}` }
+      })
+      toast.add({ title: `User Status Updated`, color: 'emerald', icon: 'i-heroicons-check-badge' })
+    }
     await refresh()
+    confirmModal.isOpen = false
   } catch (err: any) {
-    alert('Delete operation failed.')
+    if (confirmModal.type === 'delete') {
+      // Hardcoded English message for deletion failure due to unreturned books
+      toast.add({ 
+        title: 'Deletion Failed', 
+        description: 'This account cannot be deleted because the user has unreturned books.', 
+        color: 'rose',
+        icon: 'i-heroicons-exclamation-circle'
+      })
+    } else {
+      toast.add({ title: 'Operation Failed', description: err.data?.message, color: 'rose' })
+    }
+  } finally {
+    actionPending.value = false
+    confirmModal.targetUser = null
   }
 }
 
@@ -237,11 +315,12 @@ const handleSaveAdmin = async () => {
       body: newAdmin.value,
       headers: { Authorization: `Bearer ${useCookie('auth_token').value}` }
     })
+    toast.add({ title: 'Admin Created Successfully', color: 'emerald' })
     currentMode.value = 'view'
     newAdmin.value = { username: '', email: '', password: '' } 
     await refresh()
   } catch (err: any) {
-    alert('Failed to create admin: ' + (err.data?.message || 'Check connection'))
+    toast.add({ title: 'Creation Failed', description: err.data?.message, color: 'rose' })
   } finally {
     pending.value = false
   }

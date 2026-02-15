@@ -57,7 +57,8 @@
                     variant="solid" 
                     icon="i-heroicons-arrow-uturn-left"
                     class="font-black rounded-lg shadow-sm hover:shadow-emerald-500/20"
-                    @click="handleReturn(row.bookId)" 
+                    :loading="returningId === row.bookId"
+                    @click="handleReturn(row.bookId, row.bookTitle)" 
                   />
                 </template>
               </UTable>
@@ -110,12 +111,15 @@
 
 <script setup lang="ts">
 /**
- * My Loans - UI Upgrade v2 (Enhanced Visibility)
+ * My Loans - UI Upgrade v2.1 (Pure Nuxt UI Feedback)
  */
 
 definePageMeta({ layout: 'user', middleware: 'auth' })
 
+const toast = useToast()
 const searchQuery = ref('')
+const returningId = ref<number | null>(null)
+
 const tabs = [
   { label: 'Active Readings', slot: 'active', icon: 'i-heroicons-fire' },
   { label: 'Archive', slot: 'history', icon: 'i-heroicons-archive-box' }
@@ -155,16 +159,33 @@ const filteredHistory = computed(() => {
   return history.filter(l => l.bookTitle?.toLowerCase().includes(searchQuery.value.toLowerCase()))
 })
 
-const handleReturn = async (bookId: number) => {
-  if (!confirm('Return this book to the library?')) return
+const handleReturn = async (bookId: number, bookTitle: string) => {
+  // 替换 confirm 为自定义操作提示 (或直接执行并给成功反馈)
+  returningId.value = bookId
+  
   try {
     await $fetch(`/api/borrowings/return/${bookId}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${useCookie('auth_token').value}` }
     })
+    
+    toast.add({
+      title: 'Book Returned',
+      description: `"${bookTitle}" has been successfully returned.`,
+      color: 'emerald',
+      icon: 'i-heroicons-check-badge'
+    })
+    
     await refresh() 
   } catch (err: any) {
-    alert(err.data?.message || 'Server Error')
+    toast.add({
+      title: 'Return Failed',
+      description: err.data?.message || 'The system encountered an error.',
+      color: 'rose',
+      icon: 'i-heroicons-x-circle'
+    })
+  } finally {
+    returningId.value = null
   }
 }
 </script>
@@ -183,7 +204,6 @@ const handleReturn = async (bookId: number) => {
   @apply text-sm !important;
 }
 
-/* 强制提升历史记录表格中书名的字重 */
 :deep(.u-table td) {
   @apply py-3 !important;
 }

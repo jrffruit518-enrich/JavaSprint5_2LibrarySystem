@@ -60,7 +60,7 @@
           type="submit"
           block
           color="emerald"
-          class="mt-8 btn-glow font-black py-3 rounded-xl transition-all active:scale-95"
+          class="mt-8 btn-glow btn-shimmer font-black py-3 rounded-xl transition-all active:scale-95"
           size="lg"
           :loading="isSubmitting"
         >
@@ -90,8 +90,8 @@
 
 <script setup lang="ts">
 /**
- * Register Page (Jules v4.2 - English UI & Stability)
- * Logic preserved. Interface switched to English.
+ * Register Page (Logic Simplified v4.5 + Visual Polish)
+ * Integrated btn-shimmer for enhanced UI interaction.
  */
 
 const toast = useToast()
@@ -105,7 +105,6 @@ const isSubmitting = ref(false)
 const errorMsg = ref('')
 
 const handleRegister = async () => {
-  // Logic remains unchanged
   if (registerForm.password.length < 6) {
     errorMsg.value = 'Password must be at least 6 characters'
     toast.add({ 
@@ -138,16 +137,41 @@ const handleRegister = async () => {
     }, 1500)
 
   } catch (err: any) {
-    // English feedback for the UI
-    errorMsg.value = err.data?.message || 'Registration failed. Please check your connection.'
+    errorMsg.value = 'Registration failed: The username or email already exists.'
     toast.add({ 
-      title: 'System Error', 
-      description: errorMsg.value, 
+      title: 'Identity Conflict', 
+      description: 'This account could not be created. Please use a different username or email.', 
       color: 'rose',
-      icon: 'i-heroicons-x-circle'
+      icon: 'i-heroicons-exclamation-triangle'
     })
   } finally {
     isSubmitting.value = false
   }
 }
 </script>
+
+<style scoped>
+/* 局部样式保留，确保玻璃拟态效果 */
+.glass-effect {
+  @apply bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/20;
+}
+
+.btn-glow {
+  @apply shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40;
+}
+
+@keyframes spring-in {
+  0% { transform: scale(0.95); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-spring-in {
+  animation: spring-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+</style>

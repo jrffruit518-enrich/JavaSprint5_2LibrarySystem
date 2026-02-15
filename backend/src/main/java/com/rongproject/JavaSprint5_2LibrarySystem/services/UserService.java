@@ -39,7 +39,7 @@ public class UserService {
 
         // 2. Global uniqueness check for Username
         if (userRepository.existsByUsername(user.getUsername())) {
-            throw new AlreadyExistsException("Username already exists");
+            throw new AlreadyExistsException("Conflict: Username '" + user.getUsername() + "' is already taken.");
         }
 
         // 3. Default role assignment if null
@@ -49,7 +49,7 @@ public class UserService {
 
         // 4. Global uniqueness check for Email
         if (userRepository.existsByEmail(user.getEmail())) {
-            throw new AlreadyExistsException("Email already exists");
+            throw new AlreadyExistsException("Conflict: Email '" + user.getEmail() + "' is already in use.");
         }
 
         // 5. Password encoding and Save

@@ -58,24 +58,39 @@
           <div class="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></div>
           Terminal Operations
         </h3>
-        <div class="flex flex-wrap gap-8">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
           <UButton 
             to="/user/books" 
             icon="i-heroicons-magnifying-glass-solid" 
             color="emerald" 
-            class="btn-glow font-black px-10 py-4 rounded-2xl active:scale-95 transition-all text-base"
+            class="btn-glow font-black py-4 rounded-2xl active:scale-95 transition-all text-base flex justify-center"
             size="xl"
+            block
           >
             Explore Library
           </UButton>
+          
           <UButton 
             to="/user/loans" 
             icon="i-heroicons-bookmark-solid" 
             variant="ghost"
-            class="font-black px-10 py-4 rounded-2xl border-2 border-slate-300 dark:border-white/20 hover:bg-white/30 text-base transition-all text-slate-800 dark:text-slate-100"
+            class="font-black py-4 rounded-2xl border-2 border-slate-300 dark:border-white/20 hover:bg-white/30 text-base transition-all text-slate-800 dark:text-slate-100 flex justify-center"
             size="xl"
+            block
           >
             Manage My Loans
+          </UButton>
+
+          <UButton 
+            to="/user/profile" 
+            icon="i-heroicons-user-circle-solid" 
+            variant="soft"
+            color="indigo"
+            class="font-black py-4 rounded-2xl border-2 border-transparent hover:border-indigo-500/50 text-base transition-all flex justify-center"
+            size="xl"
+            block
+          >
+            My Profile
           </UButton>
         </div>
       </div>
@@ -91,9 +106,9 @@
 
 <script setup lang="ts">
 /**
- * User Dashboard Index (Jules v4.9 - Visual Restore + Hydration Guard)
- * 1. 补回了背景装饰光和 UI 配置。
- * 2. 优化了统计逻辑的健壮性。
+ * User Dashboard Index (Jules v4.9.2 - Uniform Layout)
+ * 1. Fixed button width inconsistency using Grid.
+ * 2. Maintained visual restore + Hydration guard.
  */
 definePageMeta({
   layout: 'user',
@@ -116,3 +131,14 @@ const stats = computed(() => {
   return { borrowed: activeList.length, overdue: overdueCount }
 })
 </script>
+
+<style scoped>
+.animate-spring-in {
+  animation: spring-in 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes spring-in {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>
